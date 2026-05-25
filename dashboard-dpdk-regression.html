@@ -1,0 +1,1511 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>DPDK Regression Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #050c1a; --bg2: #0b1628; --bg3: #0f1e35;
+      --surface: rgba(255,255,255,0.045); --border: rgba(255,255,255,0.09);
+      --text: #dde6f0; --muted: rgba(180,200,220,0.60);
+      --accent: #3b82f6; --accent2: #06b6d4;
+      --pass: #10b981; --fail: #f43f5e; --prog: #f59e0b;
+      --radius: 14px; --radius-lg: 20px;
+      --mono: 'JetBrains Mono','Fira Code','Cascadia Code',monospace;
+      color-scheme: dark;
+    }
+    html, body { height: 100%; }
+    body { font-family: 'Segoe UI',system-ui,-apple-system,sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+    body::before { content:''; position:fixed; inset:0; pointer-events:none; z-index:0; background-image: linear-gradient(rgba(59,130,246,0.04) 1px,transparent 1px), linear-gradient(90deg,rgba(59,130,246,0.04) 1px,transparent 1px); background-size:40px 40px; }
+    body::after  { content:''; position:fixed; inset:0; pointer-events:none; z-index:0; background: radial-gradient(ellipse 70% 50% at 50% 0%,rgba(59,130,246,0.10) 0%,transparent 70%); }
+    .page { position:relative; z-index:1; display:flex; flex-direction:column; min-height:100vh; }
+
+    /* Header */
+    header { position:sticky; top:0; z-index:50; border-bottom:1px solid var(--border); background:rgba(5,12,26,0.85); backdrop-filter:blur(12px); }
+    .header-inner { max-width:1500px; margin:0 auto; padding:12px 24px; display:flex; align-items:center; gap:12px; }
+    .logo { width:38px; height:38px; border-radius:10px; flex-shrink:0; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-size:18px; box-shadow:0 0 20px rgba(59,130,246,0.4); }
+    .header-title { flex:1; }
+    .header-title h1 { font-size:18px; font-weight:700; letter-spacing:-0.3px; }
+    .header-title p  { font-size:12px; color:var(--muted); margin-top:2px; }
+    .tag { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:99px; font-size:10px; font-weight:600; background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); color:#93c5fd; vertical-align:middle; }
+    .btn { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:var(--radius); font-size:13px; font-weight:600; border:1px solid var(--border); background:var(--surface); color:var(--text); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+    .btn:hover { background:rgba(255,255,255,0.09); border-color:rgba(255,255,255,0.18); }
+    .btn-primary { background:var(--accent); border-color:transparent; color:#fff; box-shadow:0 0 20px rgba(59,130,246,0.35); }
+    .btn-primary:hover { background:#2563eb; }
+    .btn-danger { background:rgba(244,63,94,0.15); border-color:rgba(244,63,94,0.3); color:#fda4af; }
+    .btn-danger:hover { background:rgba(244,63,94,0.25); }
+
+    /* Main */
+    main { max-width:1500px; margin:0 auto; padding:24px; flex:1; width:100%; }
+
+    /* Token panel */
+    .token-panel { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px 24px; margin-bottom:24px; }
+    .token-panel > label { font-size:13px; font-weight:600; color:var(--muted); display:block; margin-bottom:8px; }
+    .token-row { display:flex; gap:10px; flex-wrap:wrap; }
+    .token-row input { flex:1; min-width:240px; padding:10px 14px; border-radius:var(--radius); border:1px solid var(--border); background:rgba(0,0,0,0.3); color:var(--text); font-size:13px; font-family:var(--mono); outline:none; transition:border-color 0.15s; }
+    .token-row input:focus { border-color:var(--accent); }
+    .token-hint { margin-top:8px; font-size:11px; color:var(--muted); }
+    .token-hint b { color:#93c5fd; }
+    .token-actions { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; }
+    .alert { display:none; margin-top:12px; padding:12px 16px; border-radius:var(--radius); font-size:13px; }
+    .alert.show { display:block; }
+    .alert-error   { background:rgba(244,63,94,0.10); border:1px solid rgba(244,63,94,0.25); color:#fda4af; }
+    .alert-warning { background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.25); color:#fde68a; }
+    .alert-title { font-weight:700; margin-bottom:4px; }
+
+    /* Dashboard grid */
+    .dash-grid { display:grid; grid-template-columns:300px 1fr; gap:20px; }
+    @media(max-width:960px){ .dash-grid { grid-template-columns:1fr; } }
+
+    /* Sidebar */
+    .sidebar { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; align-self:start; position:sticky; top:72px; max-height:calc(100vh - 90px); overflow-y:auto; }
+    .sidebar h2 { font-size:15px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; }
+    .filter-group { margin-bottom:12px; }
+    .filter-group label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); margin-bottom:5px; }
+    .filter-group select, .filter-group input {
+      width:100%; padding:8px 12px; border-radius:var(--radius); border:1px solid var(--border);
+      background:rgba(0,0,0,0.3); color:var(--text); font-size:12px; outline:none; transition:border-color 0.15s;
+      appearance:none; -webkit-appearance:none;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat:no-repeat; background-position:right 10px center;
+    }
+    .filter-group input { background-image:none; }
+    .filter-group select:focus, .filter-group input:focus { border-color:var(--accent); }
+    .sidebar-section { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:rgba(180,200,220,0.3); margin:16px 0 8px; padding-top:12px; border-top:1px solid var(--border); }
+
+    /* KPI */
+    .kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+    @media(max-width:800px){ .kpi-row { grid-template-columns:repeat(3,1fr); } }
+    @media(max-width:500px){ .kpi-row { grid-template-columns:repeat(2,1fr); } }
+    .kpi-card { padding:16px 18px; border-radius:var(--radius-lg); border:1px solid var(--border); background:var(--surface); position:relative; overflow:hidden; }
+    .kpi-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--kpi-color,var(--accent)); }
+    .kpi-card .kpi-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); }
+    .kpi-card .kpi-value { font-size:32px; font-weight:800; margin:6px 0 3px; font-family:var(--mono); color:var(--kpi-color,var(--text)); line-height:1; }
+    .kpi-card .kpi-sub   { font-size:10px; color:var(--muted); }
+    .kpi-total { --kpi-color:var(--accent); }
+    .kpi-pass  { --kpi-color:var(--pass); }
+    .kpi-fail  { --kpi-color:var(--fail); }
+    .kpi-prog  { --kpi-color:var(--prog); }
+    .kpi-other { --kpi-color:#a78bfa; }
+
+    /* Tabs */
+    .tab-wrapper { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden; }
+    .tab-bar { display:flex; align-items:center; gap:4px; padding:8px 12px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    .tab-btn { padding:7px 16px; border-radius:10px; font-size:13px; font-weight:600; border:1px solid transparent; background:transparent; color:var(--muted); cursor:pointer; transition:all 0.15s; }
+    .tab-btn:hover { background:rgba(255,255,255,0.07); color:var(--text); }
+    .tab-btn.active { background:rgba(59,130,246,0.15); border-color:rgba(59,130,246,0.3); color:#93c5fd; }
+    .tab-count { margin-left:auto; font-size:12px; color:var(--muted); padding:0 8px; }
+    .tab-pane { display:none; padding:20px; }
+    .tab-pane.active { display:block; }
+
+    /* Charts */
+    .charts-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:640px){ .charts-grid { grid-template-columns:1fr; } }
+    .chart-card { background:rgba(0,0,0,0.2); border:1px solid var(--border); border-radius:var(--radius-lg); padding:18px; }
+    .chart-card .chart-title { font-size:13px; font-weight:700; margin-bottom:2px; }
+    .chart-card .chart-sub   { font-size:11px; color:var(--muted); margin-bottom:14px; }
+
+    /* Matrix */
+    .matrix-header { margin-bottom:16px; }
+    .matrix-header h3 { font-size:14px; font-weight:700; }
+    .matrix-header p  { font-size:12px; color:var(--muted); margin-top:4px; }
+    .matrix-scroll { overflow:auto; border:1px solid var(--border); border-radius:var(--radius); padding:8px; background:rgba(0,0,0,0.2); }
+    .matrix-table { border-collapse:separate; border-spacing:5px; }
+    .matrix-table th { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); padding:6px 10px; text-align:left; white-space:nowrap; }
+    .matrix-table td { padding:0; }
+    .matrix-cell { padding:8px 10px; border-radius:8px; border:1px solid var(--border); text-align:center; font-size:10px; font-weight:700; letter-spacing:0.5px; min-width:90px; transition:transform 0.12s; cursor:default; }
+    .matrix-cell:hover { transform:translateY(-1px); }
+    .matrix-cell .cell-count { font-size:9px; font-weight:400; color:var(--muted); margin-top:2px; }
+    .matrix-cell.pass  { background:rgba(16,185,129,0.12); border-color:rgba(16,185,129,0.25); color:#6ee7b7; }
+    .matrix-cell.fail  { background:rgba(244,63,94,0.12);  border-color:rgba(244,63,94,0.25);  color:#fda4af; }
+    .matrix-cell.prog  { background:rgba(245,158,11,0.12); border-color:rgba(245,158,11,0.25); color:#fde68a; }
+    .matrix-cell.empty { background:rgba(255,255,255,0.03); color:rgba(255,255,255,0.2); }
+    .matrix-row-label { font-size:12px; font-weight:600; white-space:nowrap; max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+
+    /* Items table */
+    .items-table-wrap { overflow:auto; }
+    .items-table { width:100%; border-collapse:separate; border-spacing:0; font-size:12px; }
+    .items-table thead th { padding:9px 14px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); text-align:left; border-bottom:1px solid var(--border); position:sticky; top:0; background:var(--bg2); white-space:nowrap; }
+    .items-table tbody tr { transition:background 0.1s; }
+    .items-table tbody tr:hover { background:rgba(255,255,255,0.04); }
+    .items-table td { padding:10px 14px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:top; }
+    .items-table td a { color:var(--text); text-decoration:none; font-weight:600; }
+    .items-table td a:hover { color:var(--accent2); }
+    .td-sub  { font-size:10px; color:var(--muted); margin-top:2px; }
+    .td-mono { font-family:var(--mono); font-size:11px; }
+
+    /* Badges */
+    .badge { display:inline-block; padding:2px 9px; border-radius:99px; font-size:10px; font-weight:700; border:1px solid transparent; }
+    .badge-pass { background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.3); color:#6ee7b7; }
+    .badge-fail { background:rgba(244,63,94,0.15);  border-color:rgba(244,63,94,0.3);  color:#fda4af; }
+    .badge-prog { background:rgba(245,158,11,0.15); border-color:rgba(245,158,11,0.3); color:#fde68a; }
+    .badge-done { background:rgba(59,130,246,0.15); border-color:rgba(59,130,246,0.3); color:#93c5fd; }
+    .badge-unk  { background:rgba(255,255,255,0.06); border-color:var(--border); color:var(--muted); }
+
+    /* Skeleton */
+    .skeleton { border-radius:8px; background:linear-gradient(90deg,rgba(148,163,184,.1) 25%,rgba(148,163,184,.22) 37%,rgba(148,163,184,.1) 63%); background-size:400% 100%; animation:shimmer 1.4s ease-in-out infinite; }
+    @keyframes shimmer { 0%{background-position:100% 0} 100%{background-position:0 0} }
+    .skel-row { display:flex; gap:12px; margin-bottom:12px; }
+    .skel-kpi { flex:1; height:88px; }
+    .skel-bar { height:38px; width:100%; margin-bottom:10px; }
+    #loadingBox { display:none; }
+    #loadingBox.show { display:block; }
+    .empty-state { padding:48px; text-align:center; color:var(--muted); }
+    .empty-state .icon { font-size:36px; margin-bottom:10px; }
+    .empty-state p { font-size:13px; }
+
+    /* ── Data Quality ── */
+    .dq-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
+    @media(max-width:600px){ .dq-summary { grid-template-columns:1fr; } }
+    .dq-card { padding:16px 18px; border-radius:var(--radius-lg); border:1px solid rgba(244,63,94,0.25); background:rgba(244,63,94,0.07); position:relative; overflow:hidden; }
+    .dq-card.ok { border-color:rgba(16,185,129,0.25); background:rgba(16,185,129,0.07); }
+    .dq-card-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; color:var(--muted); }
+    .dq-card-value { font-size:34px; font-weight:800; font-family:var(--mono); color:#fda4af; line-height:1; margin:6px 0 3px; }
+    .dq-card.ok .dq-card-value { color:#6ee7b7; }
+    .dq-card-sub { font-size:10px; color:var(--muted); }
+    .dq-card-field { font-size:12px; font-weight:600; margin-top:6px; color:#fda4af; }
+    .dq-card.ok .dq-card-field { color:#6ee7b7; }
+    .dq-section { margin-bottom:28px; }
+    .dq-section-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .dq-section-header h3 { font-size:14px; font-weight:700; }
+    .dq-section-header .dq-count { padding:2px 10px; border-radius:99px; font-size:11px; font-weight:700; background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); color:#fda4af; }
+    .dq-section-header .dq-count.ok { background:rgba(16,185,129,0.15); border-color:rgba(16,185,129,0.3); color:#6ee7b7; }
+    .dq-table { width:100%; border-collapse:separate; border-spacing:0; font-size:12px; }
+    .dq-table thead th { padding:8px 14px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); text-align:left; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2); white-space:nowrap; }
+    .dq-table tbody tr:hover { background:rgba(255,255,255,0.04); }
+    .dq-table td { padding:9px 14px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+    .dq-table td a { color:var(--text); text-decoration:none; font-weight:600; }
+    .dq-table td a:hover { color:var(--accent2); }
+    .missing-chip { display:inline-block; padding:2px 8px; border-radius:6px; font-size:10px; font-weight:700; background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); color:#fda4af; margin:2px; }
+    .dq-ok-state { padding:32px; text-align:center; color:var(--pass); font-size:14px; font-weight:600; }
+    .dq-intro { font-size:13px; color:var(--muted); margin-bottom:20px; padding:12px 16px; background:rgba(59,130,246,0.06); border:1px solid rgba(59,130,246,0.15); border-radius:var(--radius); line-height:1.7; }
+    .dq-intro b { color:#93c5fd; }
+    ::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.12); border-radius:99px; }
+    ::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.22); }
+    @keyframes spin { to{transform:rotate(360deg);} }
+    .spinner { display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.6s linear infinite; vertical-align:middle; margin-right:4px; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <div class="header-inner">
+      <div class="logo">🧪</div>
+      <div class="header-title">
+        <h1>DPDK Regression Dashboard <span class="tag">GitHub Projects v2</span></h1>
+        <p>Project: <b>AMD-DEAE-CEME / #19</b> &nbsp;·&nbsp; Last refresh: <span id="lastRefresh">—</span> &nbsp;·&nbsp; <span id="loadedCount">0</span> items loaded</p>
+      </div>
+      <button class="btn" id="themeBtn">🌙 Theme</button>
+      <button class="btn btn-primary" id="refreshBtn">⟳ Refresh</button>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Token -->
+    <div class="token-panel">
+      <label>Fine-grained token <span style="color:var(--muted);font-weight:400">(stored only in this browser session)</span></label>
+      <div class="token-row">
+        <input id="tokenInput" type="password" placeholder="Paste fine-grained PAT (Org → Projects: Read-only)" spellcheck="false" />
+        <div class="token-actions">
+          <button class="btn" id="saveTokenBtn">💾 Save</button>
+          <button class="btn btn-primary" id="loadBtn">⚡ Load Dashboard</button>
+          <button class="btn btn-danger" id="clearBtn">✕ Clear</button>
+        </div>
+      </div>
+      <p class="token-hint">Needs a <b>fine-grained PAT</b> with <b>Organization → Projects: Read-only</b> and <b>Repository → Issues: Read-only</b> (for first-comment inference). Token never leaves your browser.</p>
+      <div class="alert alert-error"   id="errorBox"><div class="alert-title">⚠ Error</div><div id="errorMsg"></div></div>
+      <div class="alert alert-warning" id="cdnBox"><div class="alert-title">⚠ Chart.js unavailable</div><div>Charts won't render but table and matrix will work fine.</div></div>
+    </div>
+
+    <!-- Skeleton -->
+    <div id="loadingBox">
+      <div class="skel-row">
+        <div class="skeleton skel-kpi"></div><div class="skeleton skel-kpi"></div>
+        <div class="skeleton skel-kpi"></div><div class="skeleton skel-kpi"></div><div class="skeleton skel-kpi"></div>
+      </div>
+      <div class="skeleton skel-bar"></div>
+      <div class="skeleton skel-bar"></div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dash-grid" id="dashContent" style="display:none">
+
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <h2>Filters <button class="btn" id="resetFiltersBtn" style="font-size:11px;padding:4px 10px">Reset</button></h2>
+
+        <div class="sidebar-section">Core</div>
+        <div class="filter-group"><label>DPDK Version</label><select id="f_dpdk"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Platform</label><select id="f_platform"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Benchmark Type</label><select id="f_benchmark"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Ports</label><select id="f_ports"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Status</label><select id="f_status"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Phase</label><select id="f_phase"><option value="">All</option></select></div>
+
+        <div class="sidebar-section">Planning</div>
+        <div class="filter-group"><label>Sprint</label><select id="f_sprint"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Priority</label><select id="f_priority"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Issue Type</label><select id="f_issuetype"><option value="">All</option></select></div>
+        <div class="filter-group"><label>Category</label><select id="f_category"><option value="">All</option></select></div>
+
+        <div class="sidebar-section">Search</div>
+        <div class="filter-group"><input id="f_search" placeholder="Search by title…" /></div>
+        <button class="btn btn-primary" id="applyBtn" style="width:100%;justify-content:center;margin-top:4px">Apply Filters</button>
+      </aside>
+
+      <!-- Right panel -->
+      <div>
+        <!-- KPIs -->
+        <div class="kpi-row">
+          <div class="kpi-card kpi-total"><div class="kpi-label">Total Items</div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-sub">In current filter</div></div>
+          <div class="kpi-card kpi-pass"> <div class="kpi-label">✓ Completed</div><div class="kpi-value" id="kpiPass">—</div><div class="kpi-sub">Done / Pass / Success</div></div>
+          <div class="kpi-card kpi-prog"> <div class="kpi-label">⧖ Active</div><div class="kpi-value" id="kpiProg">—</div><div class="kpi-sub">Running / In Review</div></div>
+          <div class="kpi-card kpi-fail"> <div class="kpi-label">✗ Blocked</div><div class="kpi-value" id="kpiFail">—</div><div class="kpi-sub">Blocker / Fail / Re-Run</div></div>
+          <div class="kpi-card kpi-other"><div class="kpi-label">○ Backlog</div><div class="kpi-value" id="kpiOther">—</div><div class="kpi-sub">Todo / Backlog / On Hold</div></div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-wrapper">
+          <div class="tab-bar">
+            <button class="tab-btn active" data-tab="overview">Overview</button>
+            <button class="tab-btn" data-tab="matrix">Benchmark Matrix</button>
+            <button class="tab-btn" data-tab="items">All Items</button>
+            <button class="tab-btn" data-tab="quality">⚠ Data Quality <span id="dqBadge" style="display:none;margin-left:4px;padding:1px 7px;border-radius:99px;font-size:10px;background:rgba(244,63,94,0.25);border:1px solid rgba(244,63,94,0.4);color:#fda4af"></span></button>
+          </div>
+
+          <!-- Overview -->
+          <div class="tab-pane active" id="tab-overview">
+            <div class="charts-grid">
+              <div class="chart-card">
+                <div class="chart-title">Status Distribution</div>
+                <div class="chart-sub">All filtered items</div>
+                <canvas id="chartStatus" height="210"></canvas>
+              </div>
+              <div class="chart-card">
+                <div class="chart-title">Items by Platform</div>
+                <div class="chart-sub">Breakdown by status</div>
+                <canvas id="chartPlatform" height="210"></canvas>
+              </div>
+              <div class="chart-card">
+                <div class="chart-title">Items by DPDK Version</div>
+                <div class="chart-sub">Pass vs Blocked</div>
+                <canvas id="chartDpdk" height="210"></canvas>
+              </div>
+              <div class="chart-card">
+                <div class="chart-title">Items by Priority</div>
+                <div class="chart-sub">P0 → P3</div>
+                <canvas id="chartPriority" height="210"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Matrix -->
+          <div class="tab-pane" id="tab-matrix">
+            <div class="matrix-header">
+              <h3>Benchmark Type × Platform Matrix</h3>
+              <p>Worst-case aggregation per cell: Blocked &gt; Active &gt; Completed &gt; Backlog. <b>Click any cell</b> to see the items inside it.</p>
+            </div>
+            <div class="matrix-scroll"><div id="matrixGrid"></div></div>
+            <!-- Drill-down panel, hidden until a cell is clicked -->
+            <div id="matrixDrillDown" style="display:none;margin-top:20px;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
+              <div id="matrixDrillHeader" style="padding:14px 18px;background:rgba(0,0,0,0.2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+                <div id="matrixDrillTitle" style="font-weight:700;font-size:14px"></div>
+                <button class="btn" onclick="$('matrixDrillDown').style.display='none'" style="font-size:11px;padding:4px 10px">✕ Close</button>
+              </div>
+              <!-- Status breakdown bar -->
+              <div id="matrixDrillBar" style="padding:12px 18px;border-bottom:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap"></div>
+              <div style="overflow:auto">
+                <table class="items-table">
+                  <thead><tr>
+                    <th>Title</th><th>Issue Type</th><th>DPDK Ver</th>
+                    <th>Ports</th><th>Phase</th><th>Sprint</th><th>Priority</th><th>Status</th>
+                  </tr></thead>
+                  <tbody id="matrixDrillBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Data Quality -->
+          <div class="tab-pane" id="tab-quality">
+            <div id="dqContent"></div>
+          </div>
+
+          <!-- Items -->
+          <div class="tab-pane" id="tab-items" style="padding:0">
+            <div class="items-table-wrap">
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>DPDK Ver</th>
+                    <th>Platform</th>
+                    <th>Benchmark Type</th>
+                    <th>Ports</th>
+                    <th>Phase</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="itemsTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>DPDK Regression Dashboard · GitHub Projects v2 · AMD-DEAE-CEME #19</footer>
+</div>
+
+<script>
+/* ── CONFIG ── */
+const ORG            = "AMD-DEAE-CEME";
+const PROJECT_NUMBER = 19;
+
+// Exact field names from your project (verified via debugger)
+const FIELDS = {
+  dpdk:      "DPDK Version",
+  platform:  "Platform",
+  benchmark: "Benchmark type",   // ← was missing before
+  ports:     "Ports",            // ← new
+  status:    "Status",
+  sprint:    "Sprint Name",      // ← new
+  priority:  "Priority",        // ← new
+  issuetype: "Issue Type",      // ← new
+  category:  "Category",        // ← new
+  phase:     "Phase Type",      // ← new
+};
+
+// Map status values → normalised bucket
+const STATUS_MAP = {
+  pass:     ["done","completed","results analysis in progress","pass","success","runs completed"],
+  progress: ["in progress","in review","runs","testing","running"],
+  fail:     ["blocker","re-run","fail","regression","blocked"],
+  backlog:  ["todo","backlog","on hold","dependency","backlog","sprint"]
+};
+
+/* ── STATE ── */
+let allItems = [], filteredItems = [], charts = {};
+
+/* ── DOM ── */
+const $ = id => document.getElementById(id);
+const selectors = {
+  dpdk:      $('f_dpdk'),
+  platform:  $('f_platform'),
+  benchmark: $('f_benchmark'),
+  ports:     $('f_ports'),
+  status:    $('f_status'),
+  phase:     $('f_phase'),
+  sprint:    $('f_sprint'),
+  priority:  $('f_priority'),
+  issuetype: $('f_issuetype'),
+  category:  $('f_category'),
+};
+
+/* ── THEME ── */
+function setTheme(m) {
+  const l = m === 'light';
+  const r = document.documentElement.style;
+  r.setProperty('--bg',      l ? '#f0f4f8' : '');
+  r.setProperty('--bg2',     l ? '#e2e8f0' : '');
+  r.setProperty('--text',    l ? '#1e293b' : '');
+  r.setProperty('--muted',   l ? 'rgba(71,85,105,0.8)' : '');
+  r.setProperty('--surface', l ? 'rgba(0,0,0,0.04)' : '');
+  r.setProperty('--border',  l ? 'rgba(0,0,0,0.10)' : '');
+  document.body.style.colorScheme = l ? 'light' : 'dark';
+  $('themeBtn').textContent = l ? '☀️ Theme' : '🌙 Theme';
+  sessionStorage.setItem('dpdk_theme', m);
+}
+setTheme(sessionStorage.getItem('dpdk_theme') || 'dark');
+$('themeBtn').addEventListener('click', () => setTheme(sessionStorage.getItem('dpdk_theme') === 'light' ? 'dark' : 'light'));
+
+/* ── TOKEN ── */
+const getToken = () => sessionStorage.getItem('gh_token') || '';
+const setToken = t => sessionStorage.setItem('gh_token', t);
+$('tokenInput').value = getToken();
+$('saveTokenBtn').addEventListener('click', () => { setToken($('tokenInput').value.trim()); $('saveTokenBtn').textContent = '✓ Saved'; setTimeout(() => $('saveTokenBtn').textContent = '💾 Save', 1500); });
+$('clearBtn').addEventListener('click', () => { sessionStorage.removeItem('gh_token'); $('tokenInput').value = ''; });
+
+/* ── TABS ── */
+function showTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  ['overview','matrix','items','quality'].forEach(t => $('tab-'+t).classList.toggle('active', t === name));
+  if (name === 'matrix') renderMatrix(filteredItems);
+  if (name === 'quality') renderDataQuality(filteredItems);
+}
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+/* ── HELPERS ── */
+function esc(s) { return (s??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function uniq(arr) { return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})); }
+function showError(m) { $('errorMsg').textContent = m; $('errorBox').classList.add('show'); }
+function hideError()  { $('errorBox').classList.remove('show'); }
+
+function normalizeStatus(s) {
+  const x = (s||'').toLowerCase().trim();
+  for (const [key, vals] of Object.entries(STATUS_MAP)) {
+    if (vals.some(v => x.includes(v))) return key;
+  }
+  return 'backlog';
+}
+
+function statusBadge(raw) {
+  const key = normalizeStatus(raw);
+  const cls = {pass:'badge-pass',fail:'badge-fail',progress:'badge-prog',backlog:'badge-unk'}[key] || 'badge-unk';
+  return `<span class="badge ${cls}">${esc(raw||'—')}</span>`;
+}
+
+/* ── GraphQL ── */
+const GQL = "https://api.github.com/graphql";
+const QUERY = `
+query($org:String!,$number:Int!,$cursor:String){
+  organization(login:$org){
+    projectV2(number:$number){
+      items(first:100,after:$cursor){
+        pageInfo{ hasNextPage endCursor }
+        nodes{
+          id
+          content{
+            ... on Issue       {
+              title url state number
+              parent { url number title }
+              comments(first:1) { nodes { body } }
+            }
+            ... on PullRequest { title url state number }
+            ... on DraftIssue  { title }
+          }
+          fieldValues(first:50){
+            nodes{
+              ... on ProjectV2ItemFieldSingleSelectValue {
+                name field{ ... on ProjectV2FieldCommon{ name } }
+              }
+              ... on ProjectV2ItemFieldTextValue {
+                text field{ ... on ProjectV2FieldCommon{ name } }
+              }
+              ... on ProjectV2ItemFieldNumberValue {
+                number field{ ... on ProjectV2FieldCommon{ name } }
+              }
+              ... on ProjectV2ItemFieldDateValue {
+                date field{ ... on ProjectV2FieldCommon{ name } }
+              }
+              ... on ProjectV2ItemFieldIterationValue {
+                title field{ ... on ProjectV2FieldCommon{ name } }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+async function gql(token, vars) {
+  const r = await fetch(GQL, {
+    method:'POST',
+    headers:{ Authorization:`Bearer ${token}`, 'Content-Type':'application/json' },
+    body: JSON.stringify({ query: QUERY, variables: vars })
+  });
+  const j = await r.json();
+  if (!r.ok || j.errors) throw new Error(j.errors?.[0]?.message || `HTTP ${r.status}`);
+  return j;
+}
+
+async function fetchAll(token) {
+  let cursor = null, items = [];
+  while(true) {
+    const d = await gql(token, { org:ORG, number:PROJECT_NUMBER, cursor });
+    const chunk = d.data.organization.projectV2.items.nodes || [];
+    items = items.concat(chunk);
+    const pi = d.data.organization.projectV2.items.pageInfo;
+    if (!pi.hasNextPage) break;
+    cursor = pi.endCursor;
+  }
+  return items;
+}
+
+function parseItems(raw) {
+  return raw.map(it => {
+    const fmap = {};
+    (it.fieldValues?.nodes || []).forEach(fv => {
+      const fname = fv.field?.name;
+      if (!fname) return;
+      fmap[fname] = fv.name ?? fv.title ?? fv.text
+        ?? (fv.number != null ? String(fv.number) : null)
+        ?? fv.date ?? '';
+    });
+
+    // parentUrl from GitHub native sub-issue parent link
+    const parentUrl    = it.content?.parent?.url || '';
+    // First comment body (Issues only) — used as fallback for field inference
+    const firstComment = it.content?.comments?.nodes?.[0]?.body || '';
+
+    return {
+      id:           it.id || '',
+      title:        it.content?.title  || 'Untitled',
+      url:          it.content?.url    || '',
+      state:        it.content?.state  || '',
+      number:       it.content?.number || null,
+      type:         it.content?.url ? 'Issue/PR' : 'Draft',
+      parentUrl,
+      firstComment,
+      dpdk:      fmap[FIELDS.dpdk]      || '',
+      platform:  fmap[FIELDS.platform]  || '',
+      benchmark: fmap[FIELDS.benchmark] || '',
+      ports:     fmap[FIELDS.ports]     || '',
+      status:    fmap[FIELDS.status]    || 'Unknown',
+      sprint:    fmap[FIELDS.sprint]    || '',
+      priority:  fmap[FIELDS.priority]  || '',
+      issuetype: fmap[FIELDS.issuetype] || '',
+      category:  fmap[FIELDS.category]  || '',
+      phase:     fmap[FIELDS.phase]     || '',
+    };
+  });
+}
+
+// ── Parent-child field inheritance ─────────────────────────────────────────
+//
+// Hierarchy (broad → narrow):
+//   EPIC / Milestone
+//     └── Main-Task / Feature
+//           └── Sub-Task / Validation / Defect / Improvement / User Story
+//
+// Each level may have some fields set and others missing.
+// We resolve by walking the full ancestor chain, then propagating back down.
+//
+// Algorithm (3 passes):
+//   Pass 1 — Build tree:   link every item to its parent via parentUrl
+//   Pass 2 — UP (leaves→root): each parent collects missing fields from
+//             ALL descendants (not just direct children), majority vote
+//   Pass 3 — DOWN (root→leaves): walk from roots down; each child inherits
+//             any still-missing field from the nearest ancestor that has it
+//
+// This handles the full EPIC → Main-Task → Sub-Task chain in one go.
+
+const INHERIT_FIELDS = ['dpdk','platform','benchmark','ports','phase'];
+
+function resolveInheritance(items) {
+  // ── Step 1: clone + build indexes ─────────────────────────────────────
+  const resolved = items.map(x => ({
+    ...x,
+    _inherited: {},
+    _parentRef:  null,
+    _children:   [],
+  }));
+
+  const byUrl = {};
+  const byNum = {};
+  resolved.forEach(x => {
+    if (x.url)    byUrl[x.url] = x;
+    if (x.number) byNum[x.number] = x;
+  });
+
+  // ── Step 2: link via GitHub native parentUrl ───────────────────────────
+  function findByUrl(x) {
+    if (!x.parentUrl) return null;
+    if (byUrl[x.parentUrl]) return byUrl[x.parentUrl];
+    const m = x.parentUrl.match(/\/issues\/(\d+)$/);
+    if (m && byNum[+m[1]]) return byNum[+m[1]];
+    return null;
+  }
+
+  resolved.forEach(x => {
+    const p = findByUrl(x);
+    if (p && p !== x) {
+      x._parentRef = p;
+      p._children.push(x);
+    }
+  });
+
+  // ── Step 2b: title-similarity fallback (iterative, cycle-safe) ────────
+  // Only links items that:
+  //   a) have no parentRef yet
+  //   b) match a ROOT candidate on benchmark OR platform keyword
+  //      (relaxed: if one side has NO platform in title, match on bench alone)
+  //   c) the link does NOT create a cycle
+
+  const PARENT_TYPES = new Set(['epic','milestone','main-task','feature','validation']);
+  const CHILD_TYPES  = new Set(['sub-task','defect','improvement','user story']);
+
+  function isAncestorOf(ancestor, node) {
+    let cur = node._parentRef, limit = 0;
+    while (cur && limit++ < 200) {
+      if (cur === ancestor) return true;
+      cur = cur._parentRef;
+    }
+    return false;
+  }
+
+  function titleKeywords(title) {
+    const t = (title || '').toLowerCase();
+    const bench = BENCHMARK_TAXONOMY.flatMap(e => e.patterns).filter(p => p.length >= 4 && t.includes(p));
+    const plat  = PLATFORM_TAXONOMY.flatMap(e => e.patterns).filter(p => p.length >= 4 && t.includes(p));
+    return { bench, plat };
+  }
+
+  const rootCandidates = resolved.filter(x =>
+    !x._parentRef && x.url &&
+    (PARENT_TYPES.has((x.issuetype||'').toLowerCase()) ||
+     !CHILD_TYPES.has((x.issuetype||'').toLowerCase()))
+  );
+
+  resolved.forEach(x => {
+    if (x._parentRef) return;
+    if (!x.url) return;
+
+    const xk = titleKeywords(x.title);
+    if (!xk.bench.length && !xk.plat.length) return;
+
+    let bestParent = null, bestScore = 0;
+
+    for (const candidate of rootCandidates) {
+      if (candidate === x) continue;
+      if (isAncestorOf(x, candidate)) continue;
+      if ((x.issuetype||'') === (candidate.issuetype||'') &&
+          CHILD_TYPES.has((x.issuetype||'').toLowerCase())) continue;
+
+      const ck = titleKeywords(candidate.title);
+      const sharedBench = xk.bench.filter(b => ck.bench.includes(b));
+      const sharedPlat  = xk.plat.filter(p => ck.plat.includes(p));
+
+      // PRIMARY: both bench and platform match — strongest signal
+      if (sharedBench.length && sharedPlat.length) {
+        const score = 10 + sharedBench.length + sharedPlat.length;
+        if (score > bestScore) { bestScore = score; bestParent = candidate; }
+        continue;
+      }
+
+      // FALLBACK A: candidate has NO platform keywords in title at all
+      // (e.g. "Regression Testing: DPDK-25.07 for Testpmd" has no platform)
+      // Match on bench only if child has platform and candidate has bench
+      if (sharedBench.length && !ck.plat.length && xk.plat.length) {
+        const score = 5 + sharedBench.length;
+        if (score > bestScore) { bestScore = score; bestParent = candidate; }
+        continue;
+      }
+
+      // FALLBACK B: candidate has NO bench keywords in title at all
+      // Match on platform only if child has bench and candidate has platform
+      if (sharedPlat.length && !ck.bench.length && xk.bench.length) {
+        const score = 5 + sharedPlat.length;
+        if (score > bestScore) { bestScore = score; bestParent = candidate; }
+      }
+    }
+
+    if (bestParent && !isAncestorOf(x, bestParent)) {
+      x._parentRef = bestParent;
+      bestParent._children.push(x);
+      x._inherited['_titleLinked'] = true;
+    }
+  });
+
+  // ── Helpers: fully ITERATIVE — no recursion ───────────────────────────
+
+  // Returns all descendants using a queue (BFS)
+  function allDescendants(node) {
+    const result = [];
+    const queue  = [...node._children];
+    const seen   = new Set();
+    while (queue.length) {
+      const cur = queue.shift();
+      if (seen.has(cur)) continue;
+      seen.add(cur);
+      result.push(cur);
+      queue.push(...cur._children);
+    }
+    return result;
+  }
+
+  // Returns depth by walking parentRef chain iteratively
+  function getDepth(node) {
+    let d = 0, cur = node;
+    while (cur._parentRef && d < 200) { d++; cur = cur._parentRef; }
+    return d;
+  }
+
+  // ── Pass 2 — UP: each node collects from ALL descendants ──────────────
+  const deepestFirst = [...resolved].sort((a, b) => getDepth(b) - getDepth(a));
+
+  deepestFirst.forEach(node => {
+    const desc = allDescendants(node);
+    if (!desc.length) return;
+    INHERIT_FIELDS.forEach(f => {
+      if (node[f]) return;
+      const votes = {};
+      desc.forEach(d => { if (d[f]) votes[d[f]] = (votes[d[f]] || 0) + 1; });
+      const best = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
+      if (best) {
+        node[f] = best[0];
+        node._inherited[f] = 'from-children';
+      }
+    });
+  });
+
+  // ── Pass 2b — SIBLING: if still missing, check siblings (same parent) ──
+  // Handles the case where siblings share a field the parent doesn't have.
+  // e.g. "[ST-Turin Classic] Testpmd" siblings all missing DPDK — if ONE
+  // sibling has it (or gets it from a comment), all others can share it.
+  resolved.forEach(node => {
+    if (!node._parentRef) return;
+    const siblings = node._parentRef._children.filter(s => s !== node);
+    INHERIT_FIELDS.forEach(f => {
+      if (node[f]) return;
+      // Majority vote across siblings that have the field
+      const votes = {};
+      siblings.forEach(s => { if (s[f]) votes[s[f]] = (votes[s[f]] || 0) + 1; });
+      const best = Object.entries(votes).sort((a, b) => b[1] - a[1])[0];
+      if (best) {
+        node[f] = best[0];
+        node._inherited[f] = 'from-sibling';
+      }
+    });
+  });
+
+  // ── Pass 3 — DOWN: each child inherits from nearest ancestor ──────────
+  // Also scans ancestor titles (and first comments) for inferred values —
+  // so a grandparent like issue #9099 with "DPDK-25.07" in its title
+  // can resolve a field even if it was never stored as a project field.
+  const shallowestFirst = [...resolved].sort((a, b) => getDepth(a) - getDepth(b));
+
+  shallowestFirst.forEach(node => {
+    INHERIT_FIELDS.forEach(f => {
+      if (node[f]) return;
+      let cur = node._parentRef;
+      let limit = 0;
+      while (cur && limit++ < 200) {
+        // 1. Field value on ancestor (set directly or previously resolved)
+        if (cur[f]) {
+          node[f] = cur[f];
+          node._inherited[f] = 'from-parent';
+          break;
+        }
+        // 2. Infer from ancestor title
+        const fromTitle = inferFromText(cur.title);
+        if (fromTitle[f]) {
+          node[f] = fromTitle[f];
+          node._inherited[f] = 'from-parent';
+          // Also store on the ancestor so siblings benefit too
+          cur[f] = fromTitle[f];
+          cur._inherited[f] = 'from-title';
+          break;
+        }
+        // 3. Infer from ancestor's first comment
+        if (cur.firstComment) {
+          const fromComment = inferFromText(cur.firstComment);
+          if (fromComment[f]) {
+            node[f] = fromComment[f];
+            node._inherited[f] = 'from-parent';
+            // Store on ancestor so siblings benefit
+            cur[f] = fromComment[f];
+            cur._inherited[f] = 'from-comment';
+            break;
+          }
+        }
+        cur = cur._parentRef;
+      }
+    });
+  });
+
+  return resolved;
+}
+
+/* ── Filters ── */
+function populateSel(el, vals, label) {
+  const cur = el.value;
+  el.innerHTML = `<option value="">All ${label}</option>`;
+  vals.forEach(v => { const o = document.createElement('option'); o.value = o.textContent = v; if(v===cur) o.selected=true; el.appendChild(o); });
+}
+function populateFilters(items) {
+  populateSel(selectors.dpdk,      uniq(items.map(x=>x.dpdk)),      'versions');
+  populateSel(selectors.platform,  uniq(items.map(x=>x.platform)),  'platforms');
+  populateSel(selectors.benchmark, uniq(items.map(x=>x.benchmark)), 'types');
+  populateSel(selectors.ports,     uniq(items.map(x=>x.ports)),     'ports');
+  populateSel(selectors.status,    uniq(items.map(x=>x.status)),    'statuses');
+  populateSel(selectors.phase,     uniq(items.map(x=>x.phase)),     'phases');
+  populateSel(selectors.sprint,    uniq(items.map(x=>x.sprint)),    'sprints');
+  populateSel(selectors.priority,  uniq(items.map(x=>x.priority)),  'priorities');
+  populateSel(selectors.issuetype, uniq(items.map(x=>x.issuetype)), 'types');
+  populateSel(selectors.category,  uniq(items.map(x=>x.category)),  'categories');
+}
+
+function applyFilters() {
+  const v = {
+    dpdk:      selectors.dpdk.value,
+    platform:  selectors.platform.value,
+    benchmark: selectors.benchmark.value,
+    ports:     selectors.ports.value,
+    status:    selectors.status.value,
+    phase:     selectors.phase.value,
+    sprint:    selectors.sprint.value,
+    priority:  selectors.priority.value,
+    issuetype: selectors.issuetype.value,
+    category:  selectors.category.value,
+    q:         ($('f_search').value||'').trim().toLowerCase()
+  };
+  filteredItems = allItems.filter(x =>
+    (!v.dpdk      || x.dpdk      === v.dpdk)      &&
+    (!v.platform  || x.platform  === v.platform)  &&
+    (!v.benchmark || x.benchmark === v.benchmark) &&
+    (!v.ports     || x.ports     === v.ports)     &&
+    (!v.status    || x.status    === v.status)    &&
+    (!v.phase     || x.phase     === v.phase)     &&
+    (!v.sprint    || x.sprint    === v.sprint)    &&
+    (!v.priority  || x.priority  === v.priority)  &&
+    (!v.issuetype || x.issuetype === v.issuetype) &&
+    (!v.category  || x.category  === v.category)  &&
+    (!v.q         || x.title.toLowerCase().includes(v.q))
+  );
+  $('loadedCount').textContent = filteredItems.length;
+  renderKPIs(filteredItems);
+  renderItemsTable(filteredItems);
+  renderCharts(filteredItems);
+  renderMatrix(filteredItems);
+  renderDataQuality(filteredItems);
+}
+
+/* ── KPIs ── */
+function renderKPIs(items) {
+  $('kpiTotal').textContent = items.length;
+  $('kpiPass').textContent  = items.filter(x => normalizeStatus(x.status) === 'pass').length;
+  $('kpiProg').textContent  = items.filter(x => normalizeStatus(x.status) === 'progress').length;
+  $('kpiFail').textContent  = items.filter(x => normalizeStatus(x.status) === 'fail').length;
+  $('kpiOther').textContent = items.filter(x => normalizeStatus(x.status) === 'backlog').length;
+}
+
+/* ── Items table ── */
+function renderItemsTable(items) {
+  const tb = $('itemsTbody');
+  if (!items.length) {
+    tb.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="icon">🔍</div><p>No items match the current filters.</p></div></td></tr>`;
+    return;
+  }
+  tb.innerHTML = items.slice(0,500).map(x => `<tr>
+    <td>${x.url ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>` : `<span style="font-weight:600">${esc(x.title)}</span>`}<div class="td-sub">${esc(x.type)}${x.state?' · '+esc(x.state):''}</div></td>
+    <td class="td-mono">${esc(x.dpdk)||'<span style="color:var(--muted)">—</span>'}</td>
+    <td>${esc(x.platform)||'<span style="color:var(--muted)">—</span>'}</td>
+    <td>${esc(x.benchmark)||'<span style="color:var(--muted)">—</span>'}</td>
+    <td>${esc(x.ports)||'<span style="color:var(--muted)">—</span>'}</td>
+    <td>${esc(x.phase)||'<span style="color:var(--muted)">—</span>'}</td>
+    <td>${x.priority ? `<span class="badge badge-unk">${esc(x.priority)}</span>` : '<span style="color:var(--muted)">—</span>'}</td>
+    <td>${statusBadge(x.status)}</td>
+  </tr>`).join('');
+}
+
+/* ── Charts ── */
+const COLORS = {
+  pass:    'rgba(16,185,129,0.75)',
+  progress:'rgba(245,158,11,0.75)',
+  fail:    'rgba(244,63,94,0.75)',
+  backlog: 'rgba(148,163,184,0.35)',
+};
+const CHART_OPTS = {
+  plugins:{ legend:{ labels:{ color:'rgba(221,230,240,0.85)', boxRadius:4, padding:14 } } }
+};
+function mkBar(labels, datasets, stacked=false) {
+  return {
+    type:'bar',
+    data:{ labels, datasets },
+    options:{
+      ...CHART_OPTS, indexAxis:'y',
+      scales:{
+        x:{ stacked, ticks:{color:'rgba(221,230,240,0.7)'}, grid:{color:'rgba(255,255,255,0.06)'} },
+        y:{ stacked, ticks:{color:'rgba(221,230,240,0.7)'}, grid:{color:'rgba(255,255,255,0.06)'} }
+      },
+      plugins:{ ...CHART_OPTS.plugins, legend:{ ...CHART_OPTS.plugins.legend, display: stacked } }
+    }
+  };
+}
+
+function destroyChart(key) { if(charts[key]) { charts[key].destroy(); charts[key]=null; } }
+
+function renderCharts(items) {
+  if (!window.Chart) { $('cdnBox').classList.add('show'); return; }
+
+  // 1. Status donut
+  const statusCounts = {pass:0,progress:0,fail:0,backlog:0};
+  items.forEach(x => statusCounts[normalizeStatus(x.status)]++);
+  destroyChart('status');
+  charts.status = new Chart($('chartStatus'), {
+    type:'doughnut',
+    data:{
+      labels:['Completed','Active','Blocked','Backlog'],
+      datasets:[{ data:[statusCounts.pass,statusCounts.progress,statusCounts.fail,statusCounts.backlog],
+        backgroundColor:Object.values(COLORS), borderColor:'rgba(255,255,255,0.08)', borderWidth:1 }]
+    },
+    options:{ cutout:'66%', ...CHART_OPTS }
+  });
+
+  // 2. Platform stacked bar
+  const plats = uniq(items.map(x=>x.platform||'—'));
+  const platData = ['pass','progress','fail','backlog'].map((key,i) => ({
+    label: ['Completed','Active','Blocked','Backlog'][i],
+    data: plats.map(p => items.filter(x=>(x.platform||'—')===p && normalizeStatus(x.status)===key).length),
+    backgroundColor: Object.values(COLORS)[i], borderRadius:4
+  }));
+  destroyChart('platform');
+  charts.platform = new Chart($('chartPlatform'), mkBar(plats, platData, true));
+
+  // 3. DPDK version bar
+  const dpdks = uniq(items.map(x=>x.dpdk||'—'));
+  destroyChart('dpdk');
+  charts.dpdk = new Chart($('chartDpdk'), mkBar(dpdks, [
+    { label:'Completed', data:dpdks.map(d=>items.filter(x=>(x.dpdk||'—')===d&&normalizeStatus(x.status)==='pass').length),     backgroundColor:COLORS.pass,    borderRadius:4 },
+    { label:'Blocked',   data:dpdks.map(d=>items.filter(x=>(x.dpdk||'—')===d&&normalizeStatus(x.status)==='fail').length),     backgroundColor:COLORS.fail,    borderRadius:4 },
+    { label:'Backlog',   data:dpdks.map(d=>items.filter(x=>(x.dpdk||'—')===d&&normalizeStatus(x.status)==='backlog').length),  backgroundColor:COLORS.backlog, borderRadius:4 },
+  ], true));
+
+  // 4. Priority bar
+  const pris = ['P0','P1','P2','P3'];
+  destroyChart('priority');
+  charts.priority = new Chart($('chartPriority'), mkBar(pris, [
+    { label:'Completed', data:pris.map(p=>items.filter(x=>x.priority===p&&normalizeStatus(x.status)==='pass').length),     backgroundColor:COLORS.pass,     borderRadius:4 },
+    { label:'Active',    data:pris.map(p=>items.filter(x=>x.priority===p&&normalizeStatus(x.status)==='progress').length), backgroundColor:COLORS.progress, borderRadius:4 },
+    { label:'Blocked',   data:pris.map(p=>items.filter(x=>x.priority===p&&normalizeStatus(x.status)==='fail').length),     backgroundColor:COLORS.fail,     borderRadius:4 },
+  ], true));
+}
+
+/* ── Matrix ── */
+function worstStatus(arr) {
+  const keys = arr.map(normalizeStatus);
+  for (const k of ['fail','progress','pass']) if(keys.includes(k)) return k;
+  return 'backlog';
+}
+
+// Store cell items for drill-down
+let _matrixCells = {};
+
+function openMatrixDrillDown(cellKey) {
+  const items = _matrixCells[cellKey] || [];
+  if (!items.length) return;
+
+  const [bench, plat] = cellKey.split('||');
+
+  // Header
+  $('matrixDrillTitle').innerHTML =
+    `<span style="color:var(--accent2)">${esc(bench)}</span> &nbsp;×&nbsp; <span style="color:#c4b5fd">${esc(plat)}</span> &nbsp;·&nbsp; ${items.length} item${items.length>1?'s':''}`;
+
+  // Status breakdown bar
+  const counts = {pass:0, progress:0, fail:0, backlog:0};
+  items.forEach(x => counts[normalizeStatus(x.status)]++);
+  const barParts = [
+    { key:'fail',     label:'Blocked',   color:'#f43f5e' },
+    { key:'progress', label:'Active',    color:'#f59e0b' },
+    { key:'pass',     label:'Completed', color:'#10b981' },
+    { key:'backlog',  label:'Backlog',   color:'#475569' },
+  ].filter(p => counts[p.key] > 0);
+
+  $('matrixDrillBar').innerHTML = barParts.map(p => `
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:99px;
+      font-size:12px;font-weight:700;background:${p.color}22;border:1px solid ${p.color}55;color:${p.color}">
+      ${counts[p.key]} ${p.label}
+    </span>`).join('') +
+    `<span style="margin-left:auto;font-size:11px;color:var(--muted);align-self:center">
+      Click a GitHub link to open the issue
+    </span>`;
+
+  // Items table — sorted: blocked first, then active, completed, backlog
+  const order = {fail:0, progress:1, pass:2, backlog:3};
+  const sorted = [...items].sort((a,b) =>
+    (order[normalizeStatus(a.status)]||9) - (order[normalizeStatus(b.status)]||9));
+
+  $('matrixDrillBody').innerHTML = sorted.map(x => `<tr>
+    <td>${x.url
+      ? `<a href="${esc(x.url)}" target="_blank" rel="noopener">🔗 ${esc(x.title)}</a>`
+      : `<span style="font-weight:600">${esc(x.title)}</span>`}
+      <div class="td-sub">${esc(x.type)}${x.state?' · '+esc(x.state):''}</div>
+    </td>
+    <td><span class="badge badge-unk">${esc(x.issuetype)||'—'}</span></td>
+    <td class="td-mono">${esc(x.dpdk)||'—'}</td>
+    <td>${esc(x.ports)||'—'}</td>
+    <td>${esc(x.phase)||'—'}</td>
+    <td class="td-mono" style="font-size:11px">${esc(x.sprint)||'—'}</td>
+    <td>${x.priority?`<span class="badge badge-unk">${esc(x.priority)}</span>`:'—'}</td>
+    <td>${statusBadge(x.status)}</td>
+  </tr>`).join('');
+
+  const panel = $('matrixDrillDown');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function renderMatrix(items) {
+  _matrixCells = {};
+  $('matrixDrillDown').style.display = 'none';
+
+  const benches = uniq(items.map(x=>x.benchmark||'—'));
+  const plats   = uniq(items.map(x=>x.platform||'—'));
+  if (!benches.length || !plats.length) {
+    $('matrixGrid').innerHTML = `<div class="empty-state"><div class="icon">📊</div><p>No data for current filters.</p></div>`;
+    return;
+  }
+
+  // Build cell map — store full items, not just statuses
+  items.forEach(x => {
+    const k = `${x.benchmark||'—'}||${x.platform||'—'}`;
+    (_matrixCells[k] ||= []).push(x);
+  });
+
+  const SL = { pass:'PASS', progress:'ACTIVE', fail:'BLOCKED', backlog:'BACKLOG' };
+  const SC = { pass:'pass', progress:'prog',   fail:'fail',    backlog:'empty'   };
+
+  let html = `<table class="matrix-table"><thead><tr>
+    <th>Benchmark Type</th>
+    ${plats.map(p=>`<th>${esc(p)}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  benches.forEach(b => {
+    html += `<tr><td><div class="matrix-row-label" title="${esc(b)}">${esc(b)}</div></td>`;
+    plats.forEach(p => {
+      const cellItems = _matrixCells[`${b}||${p}`] || [];
+      if (!cellItems.length) {
+        html += `<td><div class="matrix-cell empty">·</div></td>`;
+        return;
+      }
+
+      const statuses = cellItems.map(x => x.status);
+      const agg      = worstStatus(statuses);
+
+      // Per-status mini breakdown for tooltip
+      const counts = {pass:0, progress:0, fail:0, backlog:0};
+      statuses.forEach(s => counts[normalizeStatus(s)]++);
+      const breakdown = [
+        counts.fail     ? `${counts.fail} Blocked`   : '',
+        counts.progress ? `${counts.progress} Active` : '',
+        counts.pass     ? `${counts.pass} Completed`  : '',
+        counts.backlog  ? `${counts.backlog} Backlog`  : '',
+      ].filter(Boolean).join(' · ');
+
+      const cellKey = `${b}||${p}`;
+      html += `<td>
+        <div class="matrix-cell ${SC[agg]}" style="cursor:pointer"
+          onclick="openMatrixDrillDown(${JSON.stringify(cellKey)})"
+          title="${esc(breakdown)}">
+          ${SL[agg]}
+          <div class="cell-count">${cellItems.length} item${cellItems.length>1?'s':''}</div>
+          <div style="font-size:9px;margin-top:3px;opacity:0.7">${esc(breakdown)}</div>
+        </div>
+      </td>`;
+    });
+    html += `</tr>`;
+  });
+
+  html += `</tbody></table>`;
+  $('matrixGrid').innerHTML = html;
+}
+
+/* ── Data Quality ── */
+const REGRESSION_CATEGORIES = ["regression testing", "regression"];
+const REQUIRED_FIELDS = [
+  { key: 'dpdk',      label: 'DPDK Version' },
+  { key: 'platform',  label: 'Platform' },
+  { key: 'benchmark', label: 'Benchmark Type' },
+];
+
+// ── Taxonomy ──────────────────────────────────────────────────────────────
+// Each entry: { patterns: [...strings to match in title], canonical, category }
+// Patterns are matched case-insensitively; longer patterns take priority.
+
+const KNOWN_DPDK = ["25.11","25.07","26.03","24.11","24.07","23.11","23.07","24.03"];
+
+const PLATFORM_TAXONOMY = [
+  // longest / most specific first
+  { patterns: ["turin dense","turin-dense","turindense"],  canonical: "Turin Dense"    },
+  { patterns: ["turin classic","turin-classic"],           canonical: "Turin Classic"  },
+  { patterns: ["st-turin classic","st-turin-classic","[st-turin"],  canonical: "Turin Classic" },
+  { patterns: ["turin"],                                   canonical: "Turin Classic"  },
+  { patterns: ["sorano"],                                  canonical: "Sorano"         },
+  { patterns: ["genoa"],                                   canonical: "Genoa"          },
+  { patterns: ["siena"],                                   canonical: "Siena"          },
+  { patterns: ["all platforms","allplatforms"],            canonical: "All Platforms"  },
+];
+
+const BENCHMARK_TAXONOMY = [
+  // NIC-based — longest/most-specific first
+  { patterns: ["testpmd","test-pmd","test_pmd"],                                        canonical: "testpmd",             category: "NIC Based" },
+  { patterns: ["l3fwd-graph","l3fwd_graph","l3fwdgraph","l3fwd graph"],                 canonical: "l3fwd-graph",         category: "NIC Based" },
+  { patterns: ["l3fwd-power","l3fwd_power","l3fwdpower","l3fwd power"],                 canonical: "l3fwd-power",         category: "NIC Based" },
+  { patterns: ["l3fwd"],                                                                canonical: "l3fwd",               category: "NIC Based" },
+  { patterns: ["packet-distributor","packet_distributor","pkt-dist","pktdist","distributor"], canonical: "Packet-distributor", category: "NIC Based" },
+  { patterns: ["event-dev","event_dev","eventdev","event dev"],                         canonical: "Event-Dev",           category: "NIC Based" },
+  { patterns: ["qos-meter","qos_meter","qosmeter","qos meter"],                         canonical: "Qos-Meter",           category: "NIC Based" },  // ← added "qos meter"
+  { patterns: ["qos-scheduler","qos_scheduler","qosscheduler","qos scheduler"],         canonical: "Qos-Scheduler",       category: "NIC Based" },
+  { patterns: ["ipsec-secgw","ipsec_secgw","ipsecsecgw","ipsec secgw","ipsec"],         canonical: "Ipsec-secGW",         category: "NIC Based" },
+  { patterns: ["vhost pvp","vhost-pvp","vhost_pvp"],                                   canonical: "vhost (PVP)",         category: "NIC Based" },
+  { patterns: ["vhost v2v","vhost-v2v","vhost_v2v"],                                   canonical: "vhost (V2V)",         category: "NIC Based" },
+  { patterns: ["vhost"],                                                                canonical: "vhost",               category: "NIC Based" },
+  { patterns: ["virtio pvp","virtio-pvp","virtio_pvp"],                                 canonical: "Virtio PVP",          category: "NIC Based" },
+  { patterns: ["virtio v2v","virtio-v2v","virtio_v2v"],                                 canonical: "virtio (V2V)",        category: "NIC Based" },
+  { patterns: ["virtio"],                                                               canonical: "virtio",              category: "NIC Based" },
+  { patterns: ["bb-dev","bb_dev","bbdev"],                                              canonical: "BB-Dev",              category: "NIC Based" },
+  // NIC + Memory combined — catch aggregate titles like "NIC and In-Memory Benchmarks"
+  { patterns: ["nic and in-memory","nic and memory","nic & memory","nic-and-memory","in-memory benchmark","nic benchmarks and memory","dpdk applications"], canonical: "NIC and Memory", category: "NIC and Memory" },
+  // Memory-based
+  { patterns: ["memcpy","mem-cpy","mem_cpy","memory copy"],                             canonical: "memcpy",              category: "Memory" },
+  { patterns: ["dma perf","dma-perf","dma_perf","dma"],                                 canonical: "DMA perf",            category: "Memory" },
+  { patterns: ["compression_perf","compression-perf","compressionperf","compress perf","compression"], canonical: "Compression_perf", category: "Memory" },
+  { patterns: ["lpm-hash","lpm_hash","lpmhash","lpm hash"],                             canonical: "LPM-Hash",            category: "Memory" },
+  { patterns: ["core-lib","core_lib","corelib","core lib","core-libraries","core libraries","core library"], canonical: "core-lib", category: "Memory" },  // ← added "core-libraries"
+  { patterns: ["crypto"],                                                               canonical: "crypto",              category: "Memory" },
+];
+
+// Sort both: longest pattern first
+PLATFORM_TAXONOMY.sort((a,b) =>
+  Math.max(...b.patterns.map(p=>p.length)) - Math.max(...a.patterns.map(p=>p.length)));
+BENCHMARK_TAXONOMY.sort((a,b) =>
+  Math.max(...b.patterns.map(p=>p.length)) - Math.max(...a.patterns.map(p=>p.length)));
+
+// Core inference — runs on any text (title or comment body)
+function inferFromText(text) {
+  const t = (text || '').toLowerCase();
+  const result = { dpdk: '', platform: '', benchmark: '', benchmarkCategory: '' };
+
+  // DPDK version — try known list first, then two regex patterns:
+  //   1. optional "dpdk" prefix:  dpdk-v25.07, dpdk 25.07, v25.07
+  //   2. bare number anywhere:    25.07, 25.11   (two-digit.two-digit)
+  for (const v of KNOWN_DPDK) {
+    if (t.includes(v)) { result.dpdk = v; break; }
+  }
+  if (!result.dpdk) {
+    // Pattern with prefix
+    const m1 = t.match(/dpdk[-\s]?v?(\d{2}\.\d{2})/);
+    if (m1) result.dpdk = m1[1];
+  }
+  if (!result.dpdk) {
+    // Bare XX.YY anywhere — two-digit dot two-digit, not preceded by another digit
+    const m2 = t.match(/(?<!\d)(\d{2}\.\d{2})(?!\d)/);
+    if (m2) result.dpdk = m2[1];
+  }
+
+  // Platform
+  for (const entry of PLATFORM_TAXONOMY) {
+    if (entry.patterns.some(p => t.includes(p))) {
+      result.platform = entry.canonical;
+      break;
+    }
+  }
+
+  // Benchmark
+  for (const entry of BENCHMARK_TAXONOMY) {
+    if (entry.patterns.some(p => t.includes(p))) {
+      result.benchmark         = entry.canonical;
+      result.benchmarkCategory = entry.category;
+      break;
+    }
+  }
+
+  return result;
+}
+
+// Kept for backward compatibility in a few call sites
+function inferFromTitle(title) { return inferFromText(title); }
+
+// Returns effective field value with source:
+//   'field'         — set directly in GitHub
+//   'from-parent'   — inherited down from parent issue
+//   'from-children' — aggregated up from child issues
+//   'from-title'    — inferred from issue title
+//   'from-comment'  — inferred from first comment body
+//   ''              — truly missing
+function effectiveField(x, key) {
+  // 1. Value already on the item (set as field, or resolved via inheritance)
+  if (x[key] && x[key].trim()) {
+    const src = x._inherited?.[key] || 'field';
+    return { value: x[key], source: src };
+  }
+  // 2. Try to infer from title
+  const fromTitle = inferFromText(x.title);
+  if (fromTitle[key]) return { value: fromTitle[key], source: 'from-title' };
+  // 3. Try to infer from first comment (only if comment exists)
+  if (x.firstComment) {
+    const fromComment = inferFromText(x.firstComment);
+    if (fromComment[key]) return { value: fromComment[key], source: 'from-comment' };
+  }
+  return { value: '', source: '' };
+}
+
+function isRegressionItem(x) {
+  const cat  = (x.category  || '').toLowerCase();
+  const type = (x.issuetype || '').toLowerCase();
+  return REGRESSION_CATEGORIES.some(r => cat.includes(r) || type.includes(r));
+}
+
+// Truly missing = no value from any source
+function getTrulyMissingFields(x) {
+  return REQUIRED_FIELDS.filter(f => !effectiveField(x, f.key).value);
+}
+
+// Non-field sources that should be moved into proper GitHub fields
+function getNonFieldSources(x) {
+  return REQUIRED_FIELDS.filter(f => {
+    const ef = effectiveField(x, f.key);
+    return ef.value && ef.source !== 'field';
+  });
+}
+
+const SOURCE_LABEL = {
+  'field':         { icon: '✓',  color: '#6ee7b7', label: 'Set in field' },
+  'from-parent':   { icon: '↓',  color: '#93c5fd', label: 'Inherited from parent' },
+  'from-children': { icon: '↑',  color: '#c4b5fd', label: 'Aggregated from children' },
+  'from-sibling':  { icon: '↔',  color: '#67e8f9', label: 'Shared from sibling' },
+  'from-title':    { icon: '⚡', color: '#fde68a', label: 'Inferred from title' },
+  'from-comment':  { icon: '💬', color: '#fb923c', label: 'Inferred from first comment' },
+};
+
+function exportDQCSV(scope) {
+  const rows = [
+    ['Title','URL','Issue Type','Status','Priority','Sprint',
+     'DPDK Version','DPDK Source','Platform','Platform Source','Benchmark Type','Benchmark Source',
+     'Missing Fields','Needs Field Update']
+  ];
+  scope.forEach(x => {
+    const dpdkEf  = effectiveField(x, 'dpdk');
+    const platEf  = effectiveField(x, 'platform');
+    const benchEf = effectiveField(x, 'benchmark');
+    const missing  = getTrulyMissingFields(x).map(f => f.label).join('; ');
+    const needsUpdate = getNonFieldSources(x).map(f => {
+      const ef = effectiveField(x, f.key);
+      return `${f.label} (${SOURCE_LABEL[ef.source]?.label || ef.source})`;
+    }).join('; ');
+    rows.push([
+      x.title, x.url, x.issuetype, x.status, x.priority, x.sprint,
+      dpdkEf.value,  dpdkEf.source,
+      platEf.value,  platEf.source,
+      benchEf.value, benchEf.source,
+      missing, needsUpdate
+    ]);
+  });
+  const csv = rows.map(r => r.map(v => `"${(v||'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `dpdk-data-quality-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// Store scope for CSV export button
+let _dqScope = [];
+
+function sourcePill(source) {
+  const s = SOURCE_LABEL[source] || { icon:'?', color:'#9ca3af', label: source };
+  return `<span style="display:inline-block;padding:2px 7px;border-radius:6px;font-size:10px;font-weight:700;
+    background:${s.color}22;border:1px solid ${s.color}55;color:${s.color}">${s.icon} ${s.label}</span>`;
+}
+
+function fieldCell(x, key) {
+  const ef = effectiveField(x, key);
+  if (!ef.value) return `<span class="missing-chip">⚠ Missing</span>`;
+  if (ef.source === 'field') return `<span style="font-size:12px">${esc(ef.value)}</span>`;
+  return `<span style="font-size:12px">${esc(ef.value)}</span><br>${sourcePill(ef.source)}`;
+}
+
+function renderDataQuality(items) {
+  const container = $('dqContent');
+  const badge     = $('dqBadge');
+
+  const regItems   = items.filter(isRegressionItem);
+  const scope      = regItems.length > 0 ? regItems : items;
+  const scopeLabel = regItems.length > 0
+    ? `Regression Testing items — ${scope.length} of ${items.length} filtered`
+    : `All filtered items (no items matched "Regression Testing" category)`;
+  _dqScope = scope;
+
+  const trulyMissing   = scope.filter(x => getTrulyMissingFields(x).length > 0);
+  const needsFieldSet  = scope.filter(x => getNonFieldSources(x).length > 0);   // resolved but not via field
+  const fullyResolved  = scope.filter(x =>
+    getTrulyMissingFields(x).length === 0 && getNonFieldSources(x).length === 0);
+
+  // Badge = items with anything still truly missing
+  badge.textContent    = trulyMissing.length;
+  badge.style.display  = trulyMissing.length > 0 ? 'inline' : 'none';
+
+  // Summary cards
+  const fieldStats = REQUIRED_FIELDS.map(f => {
+    const truly    = scope.filter(x => !effectiveField(x, f.key).value).length;
+    const fromParent   = scope.filter(x => effectiveField(x,f.key).source === 'from-parent').length;
+    const fromChildren = scope.filter(x => effectiveField(x,f.key).source === 'from-children').length;
+    const fromTitle    = scope.filter(x => effectiveField(x,f.key).source === 'from-title').length;
+    return { ...f, truly, fromParent, fromChildren, fromTitle };
+  });
+
+  let html = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px">Data Quality Check</div>
+        <div style="font-size:12px;color:var(--muted)">${scopeLabel}</div>
+      </div>
+      <button class="btn btn-primary" onclick="exportDQCSV(_dqScope)" style="flex-shrink:0">⬇ Export CSV</button>
+    </div>
+
+    <div class="dq-intro">
+      Resolution priority per field: <b>↓ inherited from parent</b> → <b>↑ aggregated from children</b> → <b>⚡ inferred from title</b> → <b>💬 inferred from first comment</b>.<br>
+      Items resolved via any of these are flagged so you can set them properly in GitHub.
+      Only items where a value cannot be found by <em>any</em> means are counted as <b>truly missing</b>.
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:24px">
+      <div class="dq-card ${trulyMissing.length===0?'ok':''}">
+        <div class="dq-card-label">Truly missing</div>
+        <div class="dq-card-value">${trulyMissing.length}</div>
+        <div class="dq-card-sub">No value anywhere — needs manual fix</div>
+      </div>
+      <div class="dq-card" style="--kpi-color:#f59e0b;border-color:rgba(245,158,11,0.25);background:rgba(245,158,11,0.07)">
+        <div class="dq-card-label">Needs field update</div>
+        <div class="dq-card-value" style="color:#fde68a">${needsFieldSet.length}</div>
+        <div class="dq-card-sub">Value found but not set as a field in GitHub</div>
+      </div>
+      <div class="dq-card ok">
+        <div class="dq-card-label">Fully resolved</div>
+        <div class="dq-card-value">${fullyResolved.length}</div>
+        <div class="dq-card-sub">All 3 fields set directly in GitHub</div>
+      </div>
+    </div>
+
+    <div class="dq-summary" style="margin-bottom:24px">
+      ${fieldStats.map(f => `
+        <div class="dq-card ${f.truly===0?'ok':''}">
+          <div class="dq-card-label">Missing: ${f.label}</div>
+          <div class="dq-card-value">${f.truly}</div>
+          <div class="dq-card-sub" style="line-height:1.8">
+            ${f.fromParent   > 0 ? `↓ ${f.fromParent} from parent<br>`   : ''}
+            ${f.fromChildren > 0 ? `↑ ${f.fromChildren} from children<br>`: ''}
+            ${f.fromTitle    > 0 ? `⚡ ${f.fromTitle} from title<br>`     : ''}
+            <span style="color:${f.truly===0?'#6ee7b7':'#fda4af'}">${scope.length-f.truly}/${scope.length} resolved</span>
+          </div>
+        </div>`).join('')}
+    </div>`;
+
+  // ── Section: Needs field set (resolved via inheritance/title) ──
+  if (needsFieldSet.length > 0) {
+    html += `
+      <div class="dq-section">
+        <div class="dq-section-header">
+          <h3>⚠ Value found — but not set as a GitHub field</h3>
+          <span class="dq-count" style="background:rgba(245,158,11,0.15);border-color:rgba(245,158,11,0.3);color:#fde68a">
+            ${needsFieldSet.length} item${needsFieldSet.length>1?'s':''}
+          </span>
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px">
+          These tickets have a value we could infer (from a parent, child, or title) but the GitHub field itself is empty.
+          Open each ticket and set the field so it's machine-readable.
+        </p>
+        <div style="overflow:auto"><table class="dq-table">
+          <thead><tr>
+            <th>Title</th><th>Issue Type</th><th>Status</th>
+            <th>DPDK Version</th><th>Platform</th><th>Benchmark Type</th>
+          </tr></thead>
+          <tbody>
+            ${needsFieldSet.map(x => `<tr>
+              <td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">🔗 ${esc(x.title)}</a>`:esc(x.title)}
+                <div class="td-sub">${esc(x.issuetype)}${x.state?' · '+esc(x.state):''}</div></td>
+              <td><span class="badge badge-unk">${esc(x.issuetype)||'—'}</span></td>
+              <td>${statusBadge(x.status)}</td>
+              <td>${fieldCell(x,'dpdk')}</td>
+              <td>${fieldCell(x,'platform')}</td>
+              <td>${fieldCell(x,'benchmark')}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </div>`;
+  }
+
+  // ── Section: Truly missing ──
+  if (trulyMissing.length === 0) {
+    html += `<div class="dq-ok-state">✅ All ${scope.length} items have all 3 fields resolved.</div>`;
+  } else {
+    const groups = {};
+    trulyMissing.forEach(x => {
+      const key = getTrulyMissingFields(x).map(f=>f.label).join(' + ');
+      (groups[key] ||= []).push(x);
+    });
+
+    html += `
+      <div class="dq-section">
+        <div class="dq-section-header">
+          <h3>✗ Truly missing — no value found anywhere</h3>
+          <span class="dq-count">${trulyMissing.length} item${trulyMissing.length>1?'s':''}</span>
+        </div>`;
+
+    Object.entries(groups)
+      .sort((a,b) => b[1].length - a[1].length)
+      .forEach(([missingLabel, groupItems]) => {
+        html += `
+          <div style="margin-bottom:20px">
+            <div style="font-size:11px;font-weight:700;color:#fda4af;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">
+              Missing: ${esc(missingLabel)} &nbsp;·&nbsp; ${groupItems.length} item${groupItems.length>1?'s':''}
+            </div>
+            <div style="overflow:auto"><table class="dq-table">
+              <thead><tr><th>Title</th><th>Issue Type</th><th>Status</th><th>Priority</th><th>Sprint</th><th>DPDK Version</th><th>Platform</th><th>Benchmark Type</th><th>First Comment (fetched)</th></tr></thead>
+              <tbody>
+                ${groupItems.map(x => `<tr>
+                  <td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">🔗 ${esc(x.title)}</a>`:esc(x.title)}
+                    <div class="td-sub">${esc(x.type)}${x.state?' · '+esc(x.state):''}</div></td>
+                  <td><span class="badge badge-unk">${esc(x.issuetype)||'—'}</span></td>
+                  <td>${statusBadge(x.status)}</td>
+                  <td>${x.priority?`<span class="badge badge-unk">${esc(x.priority)}</span>`:'—'}</td>
+                  <td class="td-mono" style="font-size:11px">${esc(x.sprint)||'—'}</td>
+                  <td>${fieldCell(x,'dpdk')}</td>
+                  <td>${fieldCell(x,'platform')}</td>
+                  <td>${fieldCell(x,'benchmark')}</td>
+                  <td style="max-width:260px;font-size:10px;color:var(--muted);font-family:var(--mono);white-space:pre-wrap;word-break:break-word">${
+                    x.firstComment
+                      ? `<span style="color:#fb923c">💬 ${esc(x.firstComment.slice(0,200))}${x.firstComment.length>200?'…':''}</span>`
+                      : `<span style="color:#f43f5e">⚠ No comment fetched — PAT may need Issues: Read permission</span>`
+                  }</td>
+                </tr>`).join('')}
+              </tbody>
+            </table></div>
+          </div>`;
+      });
+
+    html += `</div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+/* ── Events ── */
+$('applyBtn').addEventListener('click', applyFilters);
+$('f_search').addEventListener('input', applyFilters);
+$('resetFiltersBtn').addEventListener('click', () => {
+  Object.values(selectors).forEach(s => s.value='');
+  $('f_search').value = '';
+  applyFilters();
+});
+$('refreshBtn').addEventListener('click', () => { if(getToken()) loadDashboard(); else showError("No token. Paste and save your PAT first."); });
+$('loadBtn').addEventListener('click', () => { const t=$('tokenInput').value.trim(); if(t) setToken(t); loadDashboard(); });
+
+/* ── Load ── */
+async function loadDashboard() {
+  hideError();
+  const token = getToken();
+  if (!token) return showError("Paste your fine-grained PAT first.");
+  $('loadingBox').classList.add('show');
+  $('dashContent').style.display = 'none';
+  try {
+    const raw = await fetchAll(token);
+    allItems = resolveInheritance(parseItems(raw));
+    filteredItems = allItems.slice();
+    $('lastRefresh').textContent = new Date().toLocaleTimeString();
+    $('loadedCount').textContent = filteredItems.length;
+    populateFilters(allItems);
+    renderKPIs(filteredItems);
+    renderItemsTable(filteredItems);
+    renderCharts(filteredItems);
+    renderDataQuality(filteredItems);
+    $('dashContent').style.display = 'grid';
+    showTab('overview');
+  } catch(e) {
+    showError(e.message || String(e));
+  } finally {
+    $('loadingBox').classList.remove('show');
+  }
+}
+</script>
+</body>
+</html>
