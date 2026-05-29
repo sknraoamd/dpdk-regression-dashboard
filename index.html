@@ -157,7 +157,30 @@
     .empty-state .icon { font-size:36px; margin-bottom:10px; }
     .empty-state p { font-size:13px; }
 
-    /* ── Data Quality ── */
+    /* ── Timeline ── */
+    .tl-summary { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px; }
+    @media(max-width:700px){ .tl-summary { grid-template-columns:repeat(2,1fr); } }
+    .tl-section { margin-bottom:28px; }
+    .tl-section-header { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+    .tl-section-header h3 { font-size:14px; font-weight:700; }
+    .tl-count { padding:2px 10px; border-radius:99px; font-size:11px; font-weight:700; }
+    .tl-count-delayed { background:rgba(244,63,94,0.15); border:1px solid rgba(244,63,94,0.3); color:#fda4af; }
+    .tl-count-ongoing { background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#fde68a; }
+    .tl-count-ok      { background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#6ee7b7; }
+    .tl-table { width:100%; border-collapse:separate; border-spacing:0; font-size:12px; }
+    .tl-table thead th { padding:8px 14px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); text-align:left; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2); white-space:nowrap; }
+    .tl-table tbody tr:hover { background:rgba(255,255,255,0.04); }
+    .tl-table td { padding:9px 14px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+    .tl-table td a { color:var(--text); text-decoration:none; font-weight:600; }
+    .tl-table td a:hover { color:var(--accent2); }
+    .overdue-chip { display:inline-block; padding:2px 9px; border-radius:99px; font-size:11px; font-weight:700; }
+    .overdue-critical { background:rgba(244,63,94,0.2);  border:1px solid rgba(244,63,94,0.4);  color:#fda4af; }
+    .overdue-high     { background:rgba(251,146,60,0.2); border:1px solid rgba(251,146,60,0.4); color:#fdba74; }
+    .overdue-medium   { background:rgba(245,158,11,0.2); border:1px solid rgba(245,158,11,0.4); color:#fde68a; }
+    .overdue-low      { background:rgba(148,163,184,0.15);border:1px solid rgba(148,163,184,0.3);color:#94a3b8; }
+    .progress-bar-wrap { background:rgba(255,255,255,0.07); border-radius:99px; height:6px; min-width:80px; overflow:hidden; }
+    .progress-bar-fill { height:100%; border-radius:99px; transition:width 0.3s; }
+    .tl-no-date { font-size:11px; color:var(--muted); font-style:italic; }
     .dq-summary { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:24px; }
     @media(max-width:600px){ .dq-summary { grid-template-columns:1fr; } }
     .dq-card { padding:16px 18px; border-radius:var(--radius-lg); border:1px solid rgba(244,63,94,0.25); background:rgba(244,63,94,0.07); position:relative; overflow:hidden; }
@@ -187,6 +210,24 @@
     ::-webkit-scrollbar-thumb:hover { background:rgba(255,255,255,0.22); }
     @keyframes spin { to{transform:rotate(360deg);} }
     .spinner { display:inline-block; width:13px; height:13px; border:2px solid rgba(255,255,255,0.3); border-top-color:#fff; border-radius:50%; animation:spin 0.6s linear infinite; vertical-align:middle; margin-right:4px; }
+    /* ── Health score component pills ── */
+    .health-pill { padding:8px 14px; border-radius:var(--radius); font-size:11px; font-weight:700; text-align:center; min-width:90px; }
+    /* ── Sprint & Effort ── */
+    .sp-kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:20px; }
+    @media(max-width:800px){ .sp-kpi-row { grid-template-columns:repeat(3,1fr); } }
+    .effort-table { width:100%; border-collapse:separate; border-spacing:0; font-size:12px; }
+    .effort-table thead th { padding:8px 14px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); text-align:left; border-bottom:1px solid var(--border); background:rgba(0,0,0,0.2); white-space:nowrap; }
+    .effort-table tbody tr:hover { background:rgba(255,255,255,0.04); }
+    .effort-table td { padding:9px 14px; border-bottom:1px solid rgba(255,255,255,0.04); vertical-align:middle; }
+    .effort-table td a { color:var(--text); text-decoration:none; font-weight:600; }
+    .effort-table td a:hover { color:var(--accent2); }
+    .variance-over  { color:#fda4af; font-weight:700; }
+    .variance-under { color:#6ee7b7; font-weight:700; }
+    .variance-ok    { color:var(--muted); }
+    .sp-section { margin-bottom:28px; }
+    .sp-section-title { font-size:14px; font-weight:700; margin-bottom:12px; display:flex; align-items:center; gap:10px; }
+    .burndown-wrap { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:700px){ .burndown-wrap { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -260,6 +301,22 @@
 
       <!-- Right panel -->
       <div>
+      <!-- Regression Health Score -->
+      <div id="healthBanner" style="display:none;margin-bottom:16px;padding:16px 20px;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+        <div style="flex-shrink:0;text-align:center">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:4px">Regression Health</div>
+          <div id="healthScore" style="font-size:42px;font-weight:900;font-family:var(--mono);line-height:1">—</div>
+          <div id="healthGrade" style="font-size:11px;font-weight:700;margin-top:2px">—</div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div style="height:8px;border-radius:99px;background:rgba(255,255,255,0.07);overflow:hidden;margin-bottom:10px">
+            <div id="healthBar" style="height:100%;border-radius:99px;transition:width 0.6s,background 0.6s;width:0%"></div>
+          </div>
+          <div id="healthBreakdown" style="display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--muted)"></div>
+        </div>
+        <div id="healthComponents" style="display:flex;gap:12px;flex-wrap:wrap"></div>
+      </div>
+
         <!-- KPIs -->
         <div class="kpi-row">
           <div class="kpi-card kpi-total"><div class="kpi-label">Total Items</div><div class="kpi-value" id="kpiTotal">—</div><div class="kpi-sub">In current filter</div></div>
@@ -276,6 +333,8 @@
             <button class="tab-btn" data-tab="matrix">Benchmark Matrix</button>
             <button class="tab-btn" data-tab="items">All Items</button>
             <button class="tab-btn" data-tab="quality">⚠ Data Quality <span id="dqBadge" style="display:none;margin-left:4px;padding:1px 7px;border-radius:99px;font-size:10px;background:rgba(244,63,94,0.25);border:1px solid rgba(244,63,94,0.4);color:#fda4af"></span></button>
+            <button class="tab-btn" data-tab="timeline">📅 Timeline <span id="tlBadge" style="display:none;margin-left:4px;padding:1px 7px;border-radius:99px;font-size:10px;background:rgba(244,63,94,0.25);border:1px solid rgba(244,63,94,0.4);color:#fda4af"></span></button>
+            <button class="tab-btn" data-tab="sprint">🏃 Sprint & Effort</button>
           </div>
 
           <!-- Overview -->
@@ -329,6 +388,87 @@
                 </table>
               </div>
             </div>
+          </div>
+
+          <!-- Timeline -->
+          <div class="tab-pane" id="tab-timeline">
+            <!-- Timeline-specific filter bar -->
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:16px 20px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.15)">
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">Date Range</div>
+                <select id="tl_range" style="padding:7px 28px 7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 8px center" onchange="applyTlFilters()">
+                  <option value="all">All dates</option>
+                  <option value="current_month">Current month</option>
+                  <option value="next_month">Next month</option>
+                  <option value="m1">± 1 month</option>
+                  <option value="m2">± 2 months</option>
+                  <option value="m3">± 3 months</option>
+                  <option value="custom">Custom range…</option>
+                </select>
+              </div>
+              <div id="tl_custom_wrap" style="display:none;display:flex;gap:6px;align-items:center">
+                <div>
+                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">From</div>
+                  <input type="date" id="tl_from" style="padding:7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none" onchange="applyTlFilters()" />
+                </div>
+                <div>
+                  <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">To</div>
+                  <input type="date" id="tl_to" style="padding:7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none" onchange="applyTlFilters()" />
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">DPDK Version</div>
+                <select id="tl_dpdk" style="padding:7px 28px 7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 8px center" onchange="applyTlFilters()">
+                  <option value="">All versions</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">Platform</div>
+                <select id="tl_platform" style="padding:7px 28px 7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 8px center" onchange="applyTlFilters()">
+                  <option value="">All platforms</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">Priority</div>
+                <select id="tl_priority" style="padding:7px 28px 7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 8px center" onchange="applyTlFilters()">
+                  <option value="">All priorities</option>
+                  <option value="P0">P0</option>
+                  <option value="P1">P1</option>
+                  <option value="P2">P2</option>
+                  <option value="P3">P3</option>
+                </select>
+              </div>
+              <button class="btn" onclick="resetTlFilters()" style="font-size:11px;padding:7px 12px;align-self:flex-end">Reset</button>
+              <div id="tl_filter_summary" style="align-self:flex-end;font-size:11px;color:var(--muted);padding-bottom:2px"></div>
+            </div>
+            <div style="padding:20px" id="tlContent"></div>
+          </div>
+
+          <!-- Sprint & Effort -->
+          <div class="tab-pane" id="tab-sprint">
+            <!-- Sprint selector bar -->
+            <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;padding:16px 20px;border-bottom:1px solid var(--border);background:rgba(0,0,0,0.15)">
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">Sprint</div>
+                <select id="sp_sprint" style="padding:7px 28px 7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 8px center" onchange="renderSprintTab()">
+                  <option value="">All sprints</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">Issue Type</div>
+                <select id="sp_type" style="padding:7px 28px 7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 8px center" onchange="renderSprintTab()">
+                  <option value="">All types</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:var(--muted);margin-bottom:5px">Platform</div>
+                <select id="sp_platform" style="padding:7px 28px 7px 10px;border-radius:10px;border:1px solid var(--border);background:rgba(0,0,0,0.3);color:var(--text);font-size:12px;outline:none;appearance:none;-webkit-appearance:none;background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\");background-repeat:no-repeat;background-position:right 8px center" onchange="renderSprintTab()">
+                  <option value="">All platforms</option>
+                </select>
+              </div>
+              <button class="btn" onclick="resetSprintFilters()" style="font-size:11px;padding:7px 12px;align-self:flex-end">Reset</button>
+            </div>
+            <div style="padding:20px" id="spContent"></div>
           </div>
 
           <!-- Data Quality -->
@@ -433,15 +573,6 @@ $('tokenInput').value = getToken();
 $('saveTokenBtn').addEventListener('click', () => { setToken($('tokenInput').value.trim()); $('saveTokenBtn').textContent = '✓ Saved'; setTimeout(() => $('saveTokenBtn').textContent = '💾 Save', 1500); });
 $('clearBtn').addEventListener('click', () => { sessionStorage.removeItem('gh_token'); $('tokenInput').value = ''; });
 
-/* ── TABS ── */
-function showTab(name) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
-  ['overview','matrix','items','quality'].forEach(t => $('tab-'+t).classList.toggle('active', t === name));
-  if (name === 'matrix') renderMatrix(filteredItems);
-  if (name === 'quality') renderDataQuality(filteredItems);
-}
-document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
-
 /* ── HELPERS ── */
 function esc(s) { return (s??'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function uniq(arr) { return [...new Set(arr.filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})); }
@@ -530,6 +661,19 @@ async function fetchAll(token) {
   return items;
 }
 
+// ── Date & effort field names ──
+const DATE_FIELDS = {
+  plannedStart: "Planned Start date",
+  plannedEnd:   "Planned End date",
+  actualStart:  "Actual Start Date",
+  actualEnd:    "Actual End Date",
+};
+const EFFORT_FIELDS = {
+  planned:   "Planned Efforts",
+  actual:    "Actual Efforts",
+  remaining: "Remaining Efforts",
+};
+
 function parseItems(raw) {
   return raw.map(it => {
     const fmap = {};
@@ -541,9 +685,7 @@ function parseItems(raw) {
         ?? fv.date ?? '';
     });
 
-    // parentUrl from GitHub native sub-issue parent link
     const parentUrl    = it.content?.parent?.url || '';
-    // First comment body (Issues only) — used as fallback for field inference
     const firstComment = it.content?.comments?.nodes?.[0]?.body || '';
 
     return {
@@ -555,16 +697,23 @@ function parseItems(raw) {
       type:         it.content?.url ? 'Issue/PR' : 'Draft',
       parentUrl,
       firstComment,
-      dpdk:      fmap[FIELDS.dpdk]      || '',
-      platform:  fmap[FIELDS.platform]  || '',
-      benchmark: fmap[FIELDS.benchmark] || '',
-      ports:     fmap[FIELDS.ports]     || '',
-      status:    fmap[FIELDS.status]    || 'Unknown',
-      sprint:    fmap[FIELDS.sprint]    || '',
-      priority:  fmap[FIELDS.priority]  || '',
-      issuetype: fmap[FIELDS.issuetype] || '',
-      category:  fmap[FIELDS.category]  || '',
-      phase:     fmap[FIELDS.phase]     || '',
+      dpdk:         fmap[FIELDS.dpdk]      || '',
+      platform:     fmap[FIELDS.platform]  || '',
+      benchmark:    fmap[FIELDS.benchmark] || '',
+      ports:        fmap[FIELDS.ports]     || '',
+      status:       fmap[FIELDS.status]    || 'Unknown',
+      sprint:       fmap[FIELDS.sprint]    || '',
+      priority:     fmap[FIELDS.priority]  || '',
+      issuetype:    fmap[FIELDS.issuetype] || '',
+      category:     fmap[FIELDS.category]  || '',
+      phase:        fmap[FIELDS.phase]     || '',
+      plannedStart:    fmap[DATE_FIELDS.plannedStart]    || '',
+      plannedEnd:      fmap[DATE_FIELDS.plannedEnd]      || '',
+      actualStart:     fmap[DATE_FIELDS.actualStart]     || '',
+      actualEnd:       fmap[DATE_FIELDS.actualEnd]       || '',
+      plannedEfforts:  parseFloat(fmap[EFFORT_FIELDS.planned])   || 0,
+      actualEfforts:   parseFloat(fmap[EFFORT_FIELDS.actual])    || 0,
+      remainingEfforts:parseFloat(fmap[EFFORT_FIELDS.remaining]) || 0,
     };
   });
 }
@@ -862,11 +1011,13 @@ function applyFilters() {
     (!v.q         || x.title.toLowerCase().includes(v.q))
   );
   $('loadedCount').textContent = filteredItems.length;
+  renderHealthScore(filteredItems);
   renderKPIs(filteredItems);
   renderItemsTable(filteredItems);
   renderCharts(filteredItems);
   renderMatrix(filteredItems);
   renderDataQuality(filteredItems);
+  renderTimeline(filteredItems);
 }
 
 /* ── KPIs ── */
@@ -1469,6 +1620,307 @@ function renderDataQuality(items) {
   container.innerHTML = html;
 }
 
+/* ── Timeline ── */
+function parseDate(s) {
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function daysBetween(a, b) { return Math.round((b - a) / 86400000); }
+function fmtDate(s) {
+  if (!s) return '—';
+  const d = parseDate(s);
+  if (!d) return '—';
+  return d.toLocaleDateString(undefined, { day:'2-digit', month:'short', year:'numeric' });
+}
+function overdueClass(days) {
+  if (days > 30) return 'overdue-critical';
+  if (days > 14) return 'overdue-high';
+  if (days > 7)  return 'overdue-medium';
+  return 'overdue-low';
+}
+function overdueLabel(days) {
+  if (days > 30) return `${days}d overdue 🔴`;
+  if (days > 14) return `${days}d overdue 🟠`;
+  if (days > 7)  return `${days}d overdue 🟡`;
+  return `${days}d overdue`;
+}
+
+// Populate the timeline-local dropdowns from items
+function populateTlFilters(items) {
+  ['tl_dpdk','tl_platform'].forEach(id => {
+    const el  = $(id);
+    const cur = el.value;
+    const key = id === 'tl_dpdk' ? 'dpdk' : 'platform';
+    const vals = uniq(items.map(x => x[key]).filter(Boolean));
+    el.innerHTML = `<option value="">All ${id==='tl_dpdk'?'versions':'platforms'}</option>`;
+    vals.forEach(v => {
+      const o = document.createElement('option');
+      o.value = o.textContent = v;
+      if (v === cur) o.selected = true;
+      el.appendChild(o);
+    });
+  });
+}
+
+function getTlDateRange() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const range = $('tl_range').value;
+  let from = null, to = null;
+
+  if (range === 'current_month') {
+    from = new Date(today.getFullYear(), today.getMonth(), 1);
+    to   = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  } else if (range === 'next_month') {
+    from = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    to   = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+  } else if (range.startsWith('m')) {
+    const months = parseInt(range[1]);
+    from = new Date(today.getFullYear(), today.getMonth() - months, 1);
+    to   = new Date(today.getFullYear(), today.getMonth() + months + 1, 0);
+  } else if (range === 'custom') {
+    const fv = $('tl_from').value, tv = $('tl_to').value;
+    from = fv ? new Date(fv) : null;
+    to   = tv ? new Date(tv) : null;
+  }
+  return { from, to };
+}
+
+function applyTlFilters() {
+  // Show/hide custom date inputs
+  const isCustom = $('tl_range').value === 'custom';
+  $('tl_custom_wrap').style.display = isCustom ? 'flex' : 'none';
+  renderTimeline(filteredItems);
+}
+
+function resetTlFilters() {
+  $('tl_range').value    = 'all';
+  $('tl_dpdk').value     = '';
+  $('tl_platform').value = '';
+  $('tl_priority').value = '';
+  $('tl_from').value     = '';
+  $('tl_to').value       = '';
+  $('tl_custom_wrap').style.display = 'none';
+  renderTimeline(filteredItems);
+}
+
+function renderTimeline(items) {
+  const today   = new Date(); today.setHours(0,0,0,0);
+  const badge   = $('tlBadge');
+  const container = $('tlContent');
+
+  // Populate dropdowns on first call / whenever items change
+  populateTlFilters(items);
+
+  // ── Apply timeline-local filters ────────────────────────────────────────
+  const tlDpdk     = $('tl_dpdk').value;
+  const tlPlatform = $('tl_platform').value;
+  const tlPriority = $('tl_priority').value;
+  const { from: dateFrom, to: dateTo } = getTlDateRange();
+
+  // Date filter: item must have plannedEnd (or plannedStart) within range
+  function inDateRange(x) {
+    if (!dateFrom && !dateTo) return true;
+    const end   = parseDate(x.plannedEnd);
+    const start = parseDate(x.plannedStart);
+    const ref   = end || start;  // use whichever date exists
+    if (!ref) return false;
+    if (dateFrom && ref < dateFrom) return false;
+    if (dateTo   && ref > dateTo)   return false;
+    return true;
+  }
+
+  let scope = items.filter(x =>
+    (!tlDpdk     || x.dpdk     === tlDpdk)     &&
+    (!tlPlatform || x.platform === tlPlatform) &&
+    (!tlPriority || x.priority === tlPriority) &&
+    inDateRange(x)
+  );
+
+  // Update filter summary label
+  const activeFilters = [
+    tlDpdk     && `DPDK ${tlDpdk}`,
+    tlPlatform && tlPlatform,
+    tlPriority && tlPriority,
+    $('tl_range').value !== 'all' && `Date: ${$('tl_range').options[$('tl_range').selectedIndex].text}`,
+  ].filter(Boolean);
+  $('tl_filter_summary').textContent = activeFilters.length
+    ? `Showing ${scope.length} of ${items.length} items · ${activeFilters.join(' · ')}`
+    : `Showing all ${items.length} items`;
+
+  // ── Categorise ──────────────────────────────────────────────────────────
+  const delayed = scope.filter(x => {
+    const end = parseDate(x.plannedEnd);
+    return end && end < today && normalizeStatus(x.status) !== 'pass';
+  }).sort((a,b) => parseDate(a.plannedEnd) - parseDate(b.plannedEnd));
+
+  const ongoing = scope.filter(x =>
+    normalizeStatus(x.status) === 'progress' && !delayed.includes(x)
+  ).sort((a,b) => {
+    const ae = parseDate(a.plannedEnd), be = parseDate(b.plannedEnd);
+    if (ae && be) return ae - be;
+    if (ae) return -1;
+    if (be) return 1;
+    return 0;
+  });
+
+  // Update tab badge with delayed count (always from full items, not filtered)
+  const totalDelayed = items.filter(x => {
+    const end = parseDate(x.plannedEnd);
+    return end && end < today && normalizeStatus(x.status) !== 'pass';
+  }).length;
+  badge.textContent   = totalDelayed;
+  badge.style.display = totalDelayed > 0 ? 'inline' : 'none';
+
+  // ── Summary cards ────────────────────────────────────────────────────────
+  const ongoingWithDate    = ongoing.filter(x => x.plannedEnd);
+  const ongoingWithoutDate = ongoing.filter(x => !x.plannedEnd);
+  const dueSoon = ongoingWithDate.filter(x => {
+    const d = parseDate(x.plannedEnd);
+    return d && daysBetween(today, d) <= 7;
+  });
+
+  let html = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+      <div>
+        <div style="font-size:15px;font-weight:700;margin-bottom:4px">Timeline Overview</div>
+        <div style="font-size:12px;color:var(--muted)">Planned Start & End dates · Today: <b>${today.toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</b></div>
+      </div>
+    </div>
+
+    <div class="tl-summary">
+      <div class="kpi-card kpi-fail">
+        <div class="kpi-label">Delayed</div>
+        <div class="kpi-value">${delayed.length}</div>
+        <div class="kpi-sub">Past planned end, not completed</div>
+      </div>
+      <div class="kpi-card kpi-prog">
+        <div class="kpi-label">Active</div>
+        <div class="kpi-value">${ongoing.length}</div>
+        <div class="kpi-sub">${ongoingWithDate.length} with planned end date</div>
+      </div>
+      <div class="kpi-card" style="--kpi-color:#f43f5e">
+        <div class="kpi-label">Due within 7 days</div>
+        <div class="kpi-value" style="color:#fda4af">${dueSoon.length}</div>
+        <div class="kpi-sub">Active items at risk</div>
+      </div>
+      <div class="kpi-card kpi-other">
+        <div class="kpi-label">No end date</div>
+        <div class="kpi-value">${ongoingWithoutDate.length}</div>
+        <div class="kpi-sub">Active but unscheduled</div>
+      </div>
+    </div>`;
+
+  // ── Delayed section ──────────────────────────────────────────────────────
+  html += `
+    <div class="tl-section">
+      <div class="tl-section-header">
+        <h3>⏰ Delayed Items</h3>
+        <span class="tl-count tl-count-delayed">${delayed.length} item${delayed.length!==1?'s':''}</span>
+      </div>`;
+
+  if (!delayed.length) {
+    html += `<div class="empty-state"><div class="icon">✅</div><p>No delayed items for the current filter.</p></div>`;
+  } else {
+    html += `
+      <div style="overflow:auto"><table class="tl-table">
+        <thead><tr>
+          <th>Title</th><th>Issue Type</th><th>Status</th><th>Priority</th>
+          <th>Planned Start</th><th>Planned End</th><th>Overdue By</th>
+          <th>Actual Start</th><th>Platform</th><th>DPDK Ver</th>
+        </tr></thead>
+        <tbody>
+          ${delayed.map(x => {
+            const end      = parseDate(x.plannedEnd);
+            const daysOver = daysBetween(end, today);
+            return `<tr>
+              <td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">🔗 ${esc(x.title)}</a>`:esc(x.title)}
+                <div class="td-sub">${esc(x.issuetype)||esc(x.type)}</div></td>
+              <td><span class="badge badge-unk">${esc(x.issuetype)||'—'}</span></td>
+              <td>${statusBadge(x.status)}</td>
+              <td>${x.priority?`<span class="badge badge-unk">${esc(x.priority)}</span>`:'—'}</td>
+              <td style="white-space:nowrap">${fmtDate(x.plannedStart)}</td>
+              <td style="white-space:nowrap;color:#fda4af;font-weight:600">${fmtDate(x.plannedEnd)}</td>
+              <td><span class="overdue-chip ${overdueClass(daysOver)}">${overdueLabel(daysOver)}</span></td>
+              <td style="white-space:nowrap">${fmtDate(x.actualStart)}</td>
+              <td>${esc(x.platform)||'—'}</td>
+              <td class="td-mono">${esc(x.dpdk)||'—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>`;
+  }
+  html += `</div>`;
+
+  // ── Ongoing section ──────────────────────────────────────────────────────
+  html += `
+    <div class="tl-section">
+      <div class="tl-section-header">
+        <h3>⧖ Ongoing Items</h3>
+        <span class="tl-count tl-count-ongoing">${ongoing.length} item${ongoing.length!==1?'s':''}</span>
+      </div>`;
+
+  if (!ongoing.length) {
+    html += `<div class="empty-state"><div class="icon">📭</div><p>No active items for the current filter.</p></div>`;
+  } else {
+    html += `
+      <div style="overflow:auto"><table class="tl-table">
+        <thead><tr>
+          <th>Title</th><th>Issue Type</th><th>Priority</th>
+          <th>Planned Start</th><th>Planned End</th><th>Days Remaining</th><th>Progress</th>
+          <th>Actual Start</th><th>Platform</th><th>DPDK Ver</th>
+        </tr></thead>
+        <tbody>
+          ${ongoing.map(x => {
+            const start  = parseDate(x.plannedStart);
+            const end    = parseDate(x.plannedEnd);
+            let daysRemaining = '', progressHtml = '';
+
+            if (end) {
+              const rem = daysBetween(today, end);
+              daysRemaining = rem >= 0
+                ? `<span style="color:${rem<=7?'#fda4af':rem<=14?'#fde68a':'#6ee7b7'};font-weight:700">${rem}d left</span>`
+                : `<span class="overdue-chip overdue-critical">${Math.abs(rem)}d overdue</span>`;
+
+              if (start && end > start) {
+                const pct      = Math.min(100, Math.max(0, Math.round(daysBetween(start, today) / daysBetween(start, end) * 100)));
+                const barColor = pct >= 90 ? '#f43f5e' : pct >= 70 ? '#f59e0b' : '#3b82f6';
+                progressHtml   = `
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="progress-bar-wrap" style="flex:1">
+                      <div class="progress-bar-fill" style="width:${pct}%;background:${barColor}"></div>
+                    </div>
+                    <span style="font-size:10px;color:var(--muted);white-space:nowrap">${pct}%</span>
+                  </div>`;
+              } else {
+                progressHtml = `<span class="tl-no-date">${start?'—':'No start date'}</span>`;
+              }
+            } else {
+              daysRemaining = `<span class="tl-no-date">No end date</span>`;
+              progressHtml  = `<span class="tl-no-date">—</span>`;
+            }
+
+            return `<tr>
+              <td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">🔗 ${esc(x.title)}</a>`:esc(x.title)}
+                <div class="td-sub">${esc(x.issuetype)||esc(x.type)}</div></td>
+              <td><span class="badge badge-unk">${esc(x.issuetype)||'—'}</span></td>
+              <td>${x.priority?`<span class="badge badge-unk">${esc(x.priority)}</span>`:'—'}</td>
+              <td style="white-space:nowrap">${fmtDate(x.plannedStart)}</td>
+              <td style="white-space:nowrap">${fmtDate(x.plannedEnd)}</td>
+              <td style="white-space:nowrap">${daysRemaining}</td>
+              <td style="min-width:120px">${progressHtml}</td>
+              <td style="white-space:nowrap">${fmtDate(x.actualStart)}</td>
+              <td>${esc(x.platform)||'—'}</td>
+              <td class="td-mono">${esc(x.dpdk)||'—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table></div>`;
+  }
+  html += `</div>`;
+  container.innerHTML = html;
+}
+
 /* ── Events ── */
 $('applyBtn').addEventListener('click', applyFilters);
 $('f_search').addEventListener('input', applyFilters);
@@ -1479,6 +1931,333 @@ $('resetFiltersBtn').addEventListener('click', () => {
 });
 $('refreshBtn').addEventListener('click', () => { if(getToken()) loadDashboard(); else showError("No token. Paste and save your PAT first."); });
 $('loadBtn').addEventListener('click', () => { const t=$('tokenInput').value.trim(); if(t) setToken(t); loadDashboard(); });
+
+/* ── Tab switching ── */
+function showTab(name) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  ['overview','matrix','items','quality','timeline','sprint'].forEach(t => {
+    const el = $('tab-'+t);
+    if (el) el.classList.toggle('active', t === name);
+  });
+  if (name === 'matrix')   renderMatrix(filteredItems);
+  if (name === 'quality')  renderDataQuality(filteredItems);
+  if (name === 'timeline') renderTimeline(filteredItems);
+  if (name === 'sprint')   renderSprintTab();
+}
+document.querySelectorAll('.tab-btn').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+/* ═══════════════════════════════════════════════════════════════════
+   REGRESSION HEALTH SCORE
+   Scoped to regression testing items only.
+   Score = weighted average of three components:
+     Pass Rate      40% — % of regression items that are Completed
+     On-Time Rate   35% — % with plannedEnd set that are not delayed
+     Data Quality   25% — % of regression items with all 3 fields set
+═══════════════════════════════════════════════════════════════════ */
+function renderHealthScore(items) {
+  const banner = $('healthBanner');
+  const regItems = items.filter(x => {
+    const cat  = (x.category  || '').toLowerCase();
+    const type = (x.issuetype || '').toLowerCase();
+    return ['regression testing','regression'].some(r => cat.includes(r) || type.includes(r));
+  });
+
+  if (!regItems.length) { banner.style.display = 'none'; return; }
+  banner.style.display = 'flex';
+
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // Pass rate
+  const passCount    = regItems.filter(x => normalizeStatus(x.status) === 'pass').length;
+  const passRate     = passCount / regItems.length;
+
+  // On-time rate (only items with a planned end date)
+  const scheduled    = regItems.filter(x => x.plannedEnd);
+  const onTime       = scheduled.filter(x => {
+    const end = parseDate(x.plannedEnd);
+    return !end || end >= today || normalizeStatus(x.status) === 'pass';
+  });
+  const onTimeRate   = scheduled.length ? onTime.length / scheduled.length : 1;
+
+  // Data quality rate
+  const dqPassed     = regItems.filter(x =>
+    ['dpdk','platform','benchmark'].every(f => effectiveField(x, f).value)
+  ).length;
+  const dqRate       = dqPassed / regItems.length;
+
+  // Weighted score
+  const score        = Math.round((passRate * 0.40 + onTimeRate * 0.35 + dqRate * 0.25) * 100);
+  const gradeInfo    = score >= 90 ? { grade:'A', color:'#10b981' }
+                     : score >= 75 ? { grade:'B', color:'#3b82f6' }
+                     : score >= 60 ? { grade:'C', color:'#f59e0b' }
+                     : score >= 40 ? { grade:'D', color:'#fb923c' }
+                     :               { grade:'F', color:'#f43f5e' };
+
+  $('healthScore').textContent        = `${score}%`;
+  $('healthScore').style.color        = gradeInfo.color;
+  $('healthGrade').textContent        = `Grade ${gradeInfo.grade} · ${regItems.length} regression items`;
+  $('healthGrade').style.color        = gradeInfo.color;
+  $('healthBar').style.width          = `${score}%`;
+  $('healthBar').style.background     = gradeInfo.color;
+
+  $('healthBreakdown').innerHTML = `
+    <span>Pass rate: <b style="color:${gradeInfo.color}">${Math.round(passRate*100)}%</b> (weight 40%)</span>
+    <span>On-time: <b style="color:${gradeInfo.color}">${Math.round(onTimeRate*100)}%</b> (weight 35%)</span>
+    <span>Data quality: <b style="color:${gradeInfo.color}">${Math.round(dqRate*100)}%</b> (weight 25%)</span>`;
+
+  $('healthComponents').innerHTML = [
+    { label:'Pass Rate',    pct: Math.round(passRate*100),    val:`${passCount}/${regItems.length}` },
+    { label:'On-Time',      pct: Math.round(onTimeRate*100),  val:`${onTime.length}/${scheduled.length||'—'}` },
+    { label:'Data Quality', pct: Math.round(dqRate*100),      val:`${dqPassed}/${regItems.length}` },
+  ].map(c => {
+    const col = c.pct>=80?'#10b981':c.pct>=60?'#f59e0b':'#f43f5e';
+    return `<div class="health-pill" style="background:${col}18;border:1px solid ${col}44;color:${col}">
+      <div style="font-size:18px;font-weight:900;font-family:var(--mono)">${c.pct}%</div>
+      <div style="font-size:9px;font-weight:700;opacity:0.8;margin-top:2px">${c.label}</div>
+      <div style="font-size:9px;opacity:0.6">${c.val}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SPRINT BURNDOWN & EFFORT TRACKING
+═══════════════════════════════════════════════════════════════════ */
+function populateSprintFilters(items) {
+  // Sprint selector — sorted chronologically (most recent first)
+  const sprints = uniq(items.map(x => x.sprint).filter(Boolean)).reverse();
+  const spEl = $('sp_sprint');
+  const cur  = spEl.value;
+  spEl.innerHTML = '<option value="">All sprints</option>';
+  sprints.forEach(v => {
+    const o = document.createElement('option');
+    o.value = o.textContent = v;
+    if (v === cur) o.selected = true;
+    spEl.appendChild(o);
+  });
+
+  populateSel($('sp_type'),     uniq(items.map(x=>x.issuetype).filter(Boolean)), 'types');
+  populateSel($('sp_platform'), uniq(items.map(x=>x.platform).filter(Boolean)),  'platforms');
+}
+
+function resetSprintFilters() {
+  $('sp_sprint').value   = '';
+  $('sp_type').value     = '';
+  $('sp_platform').value = '';
+  renderSprintTab();
+}
+
+function renderSprintTab() {
+  populateSprintFilters(filteredItems);
+
+  const sprint   = $('sp_sprint').value;
+  const type     = $('sp_type').value;
+  const platform = $('sp_platform').value;
+
+  let scope = filteredItems.filter(x =>
+    (!sprint   || x.sprint   === sprint)   &&
+    (!type     || x.issuetype === type)    &&
+    (!platform || x.platform  === platform)
+  );
+
+  const container = $('spContent');
+
+  /* ── Sprint KPIs ─────────────────────────────────────────────── */
+  const total     = scope.length;
+  const completed = scope.filter(x => normalizeStatus(x.status) === 'pass').length;
+  const active    = scope.filter(x => normalizeStatus(x.status) === 'progress').length;
+  const blocked   = scope.filter(x => normalizeStatus(x.status) === 'fail').length;
+  const backlog   = scope.filter(x => normalizeStatus(x.status) === 'backlog').length;
+  const compPct   = total ? Math.round(completed/total*100) : 0;
+
+  // Effort totals
+  const totPlanned   = scope.reduce((s,x) => s + x.plannedEfforts,   0);
+  const totActual    = scope.reduce((s,x) => s + x.actualEfforts,    0);
+  const totRemaining = scope.reduce((s,x) => s + x.remainingEfforts, 0);
+  const effortVar    = totActual - totPlanned;
+  const hasEffort    = totPlanned > 0 || totActual > 0;
+
+  let html = `
+    <div class="sp-kpi-row">
+      <div class="kpi-card kpi-total"><div class="kpi-label">Total Items</div><div class="kpi-value">${total}</div><div class="kpi-sub">${sprint||'All sprints'}</div></div>
+      <div class="kpi-card kpi-pass"><div class="kpi-label">✓ Completed</div><div class="kpi-value">${completed}</div><div class="kpi-sub">${compPct}% done</div></div>
+      <div class="kpi-card kpi-prog"><div class="kpi-label">⧖ Active</div><div class="kpi-value">${active}</div><div class="kpi-sub">In progress</div></div>
+      <div class="kpi-card kpi-fail"><div class="kpi-label">✗ Blocked</div><div class="kpi-value">${blocked}</div><div class="kpi-sub">Needs attention</div></div>
+      <div class="kpi-card kpi-other"><div class="kpi-label">○ Backlog</div><div class="kpi-value">${backlog}</div><div class="kpi-sub">Not started</div></div>
+    </div>`;
+
+  /* ── Burndown chart ──────────────────────────────────────────── */
+  // Group items by sprint, show completion across sprints as a trend
+  const allSprints = uniq(filteredItems.map(x=>x.sprint).filter(Boolean));
+  const burnData   = allSprints.map(sp => {
+    const spItems = filteredItems.filter(x => x.sprint === sp);
+    const done    = spItems.filter(x => normalizeStatus(x.status) === 'pass').length;
+    const total   = spItems.length;
+    return { sprint: sp, done, total, pct: total ? Math.round(done/total*100) : 0,
+             blocked: spItems.filter(x => normalizeStatus(x.status) === 'fail').length };
+  });
+
+  html += `
+    <div class="burndown-wrap">
+      <div class="chart-card">
+        <div class="chart-title">Sprint Completion Trend</div>
+        <div class="chart-sub">% completed per sprint · all filtered items</div>
+        <canvas id="chartBurndown" height="220"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Sprint Item Distribution</div>
+        <div class="chart-sub">Completed vs Blocked vs Backlog per sprint</div>
+        <canvas id="chartSprintDist" height="220"></canvas>
+      </div>
+    </div>`;
+
+  /* ── Effort summary ──────────────────────────────────────────── */
+  if (hasEffort) {
+    const effortColor = effortVar > 0 ? '#f43f5e' : '#10b981';
+    const burnPct     = totPlanned > 0 ? Math.min(100, Math.round(totActual/totPlanned*100)) : 0;
+    html += `
+      <div class="sp-section">
+        <div class="sp-section-title">⚡ Effort Summary
+          <span style="font-size:11px;font-weight:400;color:var(--muted)">(Days · items with effort data only)</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+          <div class="kpi-card" style="--kpi-color:#3b82f6">
+            <div class="kpi-label">Planned</div>
+            <div class="kpi-value" style="color:#93c5fd">${totPlanned.toFixed(1)}</div>
+            <div class="kpi-sub">days total</div>
+          </div>
+          <div class="kpi-card" style="--kpi-color:#f59e0b">
+            <div class="kpi-label">Actual</div>
+            <div class="kpi-value" style="color:#fde68a">${totActual.toFixed(1)}</div>
+            <div class="kpi-sub">${burnPct}% of planned</div>
+          </div>
+          <div class="kpi-card" style="--kpi-color:#a78bfa">
+            <div class="kpi-label">Remaining</div>
+            <div class="kpi-value" style="color:#c4b5fd">${totRemaining.toFixed(1)}</div>
+            <div class="kpi-sub">days left</div>
+          </div>
+          <div class="kpi-card" style="--kpi-color:${effortVar>0?'#f43f5e':'#10b981'}">
+            <div class="kpi-label">Variance</div>
+            <div class="kpi-value" style="color:${effortColor}">${effortVar>0?'+':''}${effortVar.toFixed(1)}</div>
+            <div class="kpi-sub">${effortVar>0?'over budget':'under budget'}</div>
+          </div>
+        </div>
+        <!-- Effort burn progress bar -->
+        <div style="margin-bottom:20px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:6px">
+            <span>Effort burn: ${totActual.toFixed(1)}d actual of ${totPlanned.toFixed(1)}d planned</span>
+            <span style="color:${effortColor};font-weight:700">${burnPct}%</span>
+          </div>
+          <div style="height:10px;border-radius:99px;background:rgba(255,255,255,0.07);overflow:hidden">
+            <div style="height:100%;border-radius:99px;width:${burnPct}%;background:${burnPct>100?'#f43f5e':burnPct>80?'#f59e0b':'#3b82f6'};transition:width 0.5s"></div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* ── Per-item effort table ───────────────────────────────────── */
+  const withEffort = scope.filter(x => x.plannedEfforts > 0 || x.actualEfforts > 0)
+    .sort((a,b) => Math.abs(b.actualEfforts - b.plannedEfforts) - Math.abs(a.actualEfforts - a.plannedEfforts));
+
+  if (withEffort.length) {
+    html += `
+      <div class="sp-section">
+        <div class="sp-section-title">📋 Per-Item Effort Tracking
+          <span style="font-size:11px;font-weight:400;color:var(--muted)">(sorted by variance · ${withEffort.length} items with effort data)</span>
+        </div>
+        <div style="overflow:auto"><table class="effort-table">
+          <thead><tr>
+            <th>Title</th><th>Type</th><th>Status</th><th>Platform</th>
+            <th>Planned (d)</th><th>Actual (d)</th><th>Remaining (d)</th>
+            <th>Variance</th><th>Burn %</th>
+          </tr></thead>
+          <tbody>
+            ${withEffort.map(x => {
+              const variance  = x.actualEfforts - x.plannedEfforts;
+              const burnPct   = x.plannedEfforts > 0 ? Math.round(x.actualEfforts/x.plannedEfforts*100) : null;
+              const varClass  = variance > x.plannedEfforts*0.2 ? 'variance-over'
+                              : variance < 0 ? 'variance-under' : 'variance-ok';
+              const barColor  = !burnPct ? '#475569'
+                              : burnPct > 100 ? '#f43f5e' : burnPct > 80 ? '#f59e0b' : '#3b82f6';
+              return `<tr>
+                <td>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">🔗 ${esc(x.title)}</a>`:esc(x.title)}
+                  <div class="td-sub">${esc(x.sprint)||'—'}</div></td>
+                <td><span class="badge badge-unk">${esc(x.issuetype)||'—'}</span></td>
+                <td>${statusBadge(x.status)}</td>
+                <td>${esc(x.platform)||'—'}</td>
+                <td style="text-align:right;font-family:var(--mono)">${x.plannedEfforts||'—'}</td>
+                <td style="text-align:right;font-family:var(--mono)">${x.actualEfforts||'—'}</td>
+                <td style="text-align:right;font-family:var(--mono)">${x.remainingEfforts||'—'}</td>
+                <td class="${varClass}" style="text-align:right;font-family:var(--mono)">${x.plannedEfforts>0?(variance>0?'+':'')+variance.toFixed(1):'—'}</td>
+                <td style="min-width:100px">
+                  ${burnPct!=null?`
+                    <div style="display:flex;align-items:center;gap:5px">
+                      <div style="flex:1;height:6px;border-radius:99px;background:rgba(255,255,255,0.07);overflow:hidden">
+                        <div style="height:100%;width:${Math.min(burnPct,100)}%;border-radius:99px;background:${barColor}"></div>
+                      </div>
+                      <span style="font-size:10px;color:var(--muted);white-space:nowrap">${burnPct}%</span>
+                    </div>`:'—'}
+                </td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table></div>
+      </div>`;
+  } else {
+    html += `<div class="empty-state" style="padding:32px"><div class="icon">📊</div>
+      <p>No effort data found. Set <b>Planned Efforts</b> and <b>Actual Efforts</b> fields on your GitHub issues to see effort tracking here.</p></div>`;
+  }
+
+  container.innerHTML = html;
+
+  // ── Render sprint charts after HTML is in DOM ──
+  if (!window.Chart) return;
+
+  // Completion trend line chart
+  destroyChart('burndown');
+  charts.burndown = new Chart($('chartBurndown'), {
+    type: 'line',
+    data: {
+      labels: burnData.map(d => d.sprint.replace('Sprint-','')),
+      datasets: [
+        { label:'% Completed', data: burnData.map(d=>d.pct),
+          borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.15)',
+          fill:true, tension:0.3, pointRadius:4, pointBackgroundColor:'#10b981' },
+        { label:'% Blocked', data: burnData.map(d => d.total ? Math.round(d.blocked/d.total*100) : 0),
+          borderColor:'#f43f5e', backgroundColor:'rgba(244,63,94,0.10)',
+          fill:true, tension:0.3, pointRadius:4, pointBackgroundColor:'#f43f5e',
+          borderDash:[4,3] },
+      ]
+    },
+    options: {
+      plugins:{ legend:{ labels:{ color:'rgba(221,230,240,0.85)', boxRadius:4 } } },
+      scales:{
+        x:{ ticks:{ color:'rgba(221,230,240,0.7)', maxRotation:45 }, grid:{ color:'rgba(255,255,255,0.06)' } },
+        y:{ min:0, max:100, ticks:{ color:'rgba(221,230,240,0.7)', callback: v=>v+'%' }, grid:{ color:'rgba(255,255,255,0.06)' } }
+      }
+    }
+  });
+
+  // Item distribution stacked bar
+  destroyChart('sprintDist');
+  charts.sprintDist = new Chart($('chartSprintDist'), {
+    type:'bar',
+    data:{
+      labels: burnData.map(d => d.sprint.replace('Sprint-','')),
+      datasets:[
+        { label:'Completed', data:burnData.map(d=>d.done),    backgroundColor:'rgba(16,185,129,0.75)', borderRadius:3 },
+        { label:'Blocked',   data:burnData.map(d=>d.blocked), backgroundColor:'rgba(244,63,94,0.75)',  borderRadius:3 },
+        { label:'Backlog',   data:burnData.map(d=>d.total-d.done-d.blocked), backgroundColor:'rgba(148,163,184,0.35)', borderRadius:3 },
+      ]
+    },
+    options:{
+      plugins:{ legend:{ labels:{ color:'rgba(221,230,240,0.85)', boxRadius:4 } } },
+      scales:{
+        x:{ stacked:true, ticks:{ color:'rgba(221,230,240,0.7)', maxRotation:45 }, grid:{ color:'rgba(255,255,255,0.06)' } },
+        y:{ stacked:true, ticks:{ color:'rgba(221,030,240,0.7)' }, grid:{ color:'rgba(255,255,255,0.06)' } }
+      }
+    }
+  });
+}
 
 /* ── Load ── */
 async function loadDashboard() {
@@ -1494,10 +2273,12 @@ async function loadDashboard() {
     $('lastRefresh').textContent = new Date().toLocaleTimeString();
     $('loadedCount').textContent = filteredItems.length;
     populateFilters(allItems);
+    renderHealthScore(filteredItems);
     renderKPIs(filteredItems);
     renderItemsTable(filteredItems);
     renderCharts(filteredItems);
     renderDataQuality(filteredItems);
+    renderTimeline(filteredItems);
     $('dashContent').style.display = 'grid';
     showTab('overview');
   } catch(e) {
