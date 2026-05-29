@@ -1,6 +1,6 @@
 # DPDK Regression Dashboard
 
-A self-contained, single-file HTML dashboard that connects directly to your **GitHub Projects v2** board and provides regression test tracking, data quality checking, and multi-level field inference — with zero backend, zero install, and zero data sent to any third party.
+A self-contained, single-file HTML dashboard that connects directly to your **GitHub Projects v2** board and provides regression test tracking, sprint burndown, effort tracking, data quality checking, timeline management, and a regression health score — with zero backend, zero install, and zero data sent to any third party.
 
 ---
 
@@ -28,7 +28,7 @@ The dashboard uses GitHub's GraphQL API and needs a **fine-grained Personal Acce
 5. Under **Repository permissions** → **Issues** → set to **Read-only** *(required for first-comment inference)*
 6. Click **Generate token** and copy it immediately
 
-> **Why Issues: Read-only?**  
+> **Why Issues: Read-only?**
 > The `Projects: Read-only` permission covers all project fields and item metadata, but issue comments are stored on the repository, not the project. Without `Issues: Read-only`, `comments(first:1)` returns an empty array and first-comment inference cannot run. If comments show as `⚠ No comment fetched` in the Data Quality tab, this is the cause.
 
 **Token security:**
@@ -71,7 +71,28 @@ const FIELDS = {
 };
 ```
 
-If a field name changes in GitHub, update the string here. Use `debug-github-fields.html` to inspect current field names and types at any time.
+Date fields used by the Timeline tab:
+
+```js
+const DATE_FIELDS = {
+  plannedStart: "Planned Start date",
+  plannedEnd:   "Planned End date",
+  actualStart:  "Actual Start Date",
+  actualEnd:    "Actual End Date",
+};
+```
+
+Effort fields used by the Sprint & Effort tab:
+
+```js
+const EFFORT_FIELDS = {
+  planned:   "Planned Efforts",
+  actual:    "Actual Efforts",
+  remaining: "Remaining Efforts",
+};
+```
+
+If any field name changes in GitHub, update the string here. Use `debug-github-fields.html` to inspect current field names and types at any time.
 
 ---
 
@@ -100,80 +121,66 @@ EPIC / Milestone
         └── Sub-Task / Validation / Defect / Improvement / User Story
 ```
 
-Links are established via GitHub's native **sub-issue parent** relationship (`content.parent.url`). If a parent issue is in the same project it is linked automatically.
-
-When a native parent link is missing, a **title-similarity fallback** attempts to link items by matching benchmark and platform keywords between parent and child titles (see Field Inference below).
+Links are established via GitHub's native **sub-issue parent** relationship (`content.parent.url`). If a parent issue is in the same project it is linked automatically. When not, a title-similarity fallback attempts to link items by matching benchmark and platform keywords.
 
 ---
 
 ## Field Inference & Inheritance
 
-For regression testing tickets, three fields are required: **DPDK Version**, **Platform**, and **Benchmark Type**. When a field is blank, the dashboard attempts to resolve it automatically through five passes in order:
+For regression testing tickets, three fields are required: **DPDK Version**, **Platform**, and **Benchmark Type**. When a field is blank, the dashboard resolves it automatically through five passes in priority order:
 
 ### Pass 1 — GitHub field value
-The field is set directly on the project item in GitHub. This is the authoritative source and is always used first.
+The field is set directly on the project item. Always the authoritative source.
 
 ### Pass 2 — ↑ Aggregated from children (UP)
-If a parent is missing a field but its descendants have it, the dashboard takes a **majority vote** across all descendants (not just direct children — the full subtree). The most common value wins.
-
-Example: an EPIC is missing Platform, but 8 of its 9 Sub-Tasks have `Platform = Turin Classic` → the EPIC is resolved as `Turin Classic`.
+If a parent is missing a field but its descendants have it, majority vote across the full subtree determines the value.
 
 ### Pass 2b — ↔ Shared from siblings
-If an item is still missing a field after the UP pass, it checks its **siblings** (other items with the same parent). Majority vote across siblings applies.
-
-This handles the case where a group of Sub-Tasks all lack DPDK Version but share the same parent — if even one sibling has the value set (or resolves it from a comment), all others get it.
+Items with the same parent check siblings for missing field values (majority vote). Handles groups of Sub-Tasks where only one has a field set.
 
 ### Pass 3 — ↓ Inherited from ancestor (DOWN)
-The item walks up its full ancestor chain (parent, grandparent, great-grandparent…) looking for a value. At each ancestor it tries three things in order:
+Each item walks its full ancestor chain (parent, grandparent, great-grandparent…). At each ancestor it tries:
+1. Stored field value
+2. Title inference (scans ancestor title for known patterns)
+3. First comment inference (scans ancestor's first comment body)
 
-1. **Stored field value** on the ancestor
-2. **Title inference** — scans the ancestor's title for known DPDK versions, platform names, and benchmark names
-3. **First comment inference** — scans the ancestor's first comment body
+When a value is found on an ancestor via title or comment, it is written back onto that ancestor so all siblings benefit automatically.
 
-When a value is found, it is written back onto the ancestor so all siblings of the child automatically benefit from the same resolution without re-scanning.
-
-Example of the full chain this solves:
+**Example — three-level chain:**
 ```
 Issue #9099  "DPDK-25.07 Regression Suite for Turin Classic"
   └── Issue #9100  "Regression Testing: Turin Classic 9755 for DPDK Applications"
         └── Issue #9101  "[ST-Turin Classic] Testpmd with rxd/txd=1024 for PF and VF"
 ```
-- #9099 has `"DPDK-25.07"` in its title but no DPDK Version field set
-- #9100 has no DPDK version anywhere in title; version is in its first comment
-- #9101 has neither
-- Pass 3 walks from #9101 → #9100 (no value, no title match) → checks #9100's comment → still none → #9099 title → finds `25.07` → writes it to #9099, #9100, and #9101
+Pass 3 walks from #9101 → #9100 (no value, title has no version) → #9099 title → finds `25.07` → writes it to #9099, #9100, and #9101.
 
 ### Pass 4 — ⚡ Inferred from own title
-Scans the item's own title for DPDK version patterns, platform names, and benchmark names.
-
-DPDK version matching tries three strategies in order:
+Scans the item's own title using three strategies:
 1. Known version list: `25.11`, `25.07`, `26.03`, `24.11`, `24.07`, `23.11`, `23.07`, `24.03`
 2. Prefixed pattern: `dpdk-v25.07`, `dpdk 25.07`, `dpdk-25.07`
 3. Bare `XX.YY` pattern anywhere in text
 
 ### Pass 5 — 💬 Inferred from own first comment
-The item's own first comment body is scanned using the same patterns as Pass 4. Intentionally limited to the first comment only to avoid picking up unrelated discussion.
+The item's first comment body is scanned using the same patterns. Limited to first comment only to avoid picking up unrelated discussion.
 
----
-
-Items resolved via Passes 2–5 are **not** counted as truly missing, but are flagged in the Data Quality tab so the team can set them as proper GitHub fields.
+Items resolved via Passes 2–5 are flagged in the Data Quality tab so the team can set them as proper GitHub fields.
 
 ---
 
 ## Title-Similarity Linking
 
-When GitHub's native parent link is absent, the dashboard attempts to link items by comparing title keywords.
+When GitHub's native parent link is absent, the dashboard links items by comparing title keywords.
 
 **Primary match** (score 10+): child and candidate parent share at least one benchmark keyword AND at least one platform keyword.
 
-**Fallback A** (score 5+): candidate parent has no platform keyword in its title at all (e.g. `"Regression Testing: DPDK-25.07 for Testpmd"` — has benchmark but no platform). Match on benchmark alone if the child has both.
+**Fallback A** (score 5+): candidate parent has no platform keyword in its title (e.g. `"Regression Testing: DPDK-25.07 for Testpmd"`). Match on benchmark alone if child has both.
 
-**Fallback B** (score 5+): same logic for missing benchmark keyword.
+**Fallback B** (score 5+): same logic when candidate has no benchmark keyword.
 
-Safeguards that prevent false links:
+Safeguards:
 - Patterns must be ≥ 4 characters to avoid short false matches
-- Cycle detection: a link is rejected if it would make an item its own ancestor
-- Same-type leaf nodes (e.g. two Sub-Tasks) cannot be linked to each other
+- Cycle detection: a link is rejected if it would make an item its own ancestor (iterative check, no recursion)
+- Same-type leaf nodes cannot be linked to each other
 
 ---
 
@@ -217,7 +224,7 @@ Safeguards that prevent false links:
 | LPM-Hash | lpm-hash, lpm hash, lpmhash |
 | core-lib | core-lib, core lib, corelib, core-libraries, core libraries, core library |
 
-To add a benchmark, add an entry to `BENCHMARK_TAXONOMY`. Longer/more-specific patterns are sorted first automatically to prevent short patterns swallowing longer ones.
+To add a benchmark, add an entry to `BENCHMARK_TAXONOMY`. Longer/more-specific patterns are sorted first automatically.
 
 ---
 
@@ -232,60 +239,88 @@ To add a benchmark, add an entry to `BENCHMARK_TAXONOMY`. Longer/more-specific p
 | Siena | siena |
 | All Platforms | all platforms, allplatforms |
 
-`"Turin Dense"` and `"Turin Classic"` are matched before bare `"Turin"`. `"[ST-Turin"` in titles like `"[ST-Turin Classic] Testpmd"` is also recognised directly.
+`"Turin Dense"` and `"Turin Classic"` are matched before bare `"Turin"`. `"[ST-Turin"` in titles like `"[ST-Turin Classic] Testpmd"` is recognised directly.
 
 ---
 
 ## Dashboard Tabs
 
+### 🩺 Regression Health Score
+Displayed as a banner above all KPI cards. Scoped to regression testing items only (`Category = "Regression testing"`). Computed as a weighted score:
+
+| Component | Weight | Formula |
+|---|---|---|
+| Pass Rate | 40% | Completed items ÷ total regression items |
+| On-Time Rate | 35% | Non-delayed scheduled items ÷ all scheduled items |
+| Data Quality | 25% | Items with all 3 fields resolved ÷ total regression items |
+
+Displays a 0–100% score, letter grade (A/B/C/D/F), colour-coded bar, and three component pills. Updates whenever filters change.
+
 ### Overview
 Four charts, all updating when filters change:
-- **Status distribution** — donut showing Completed / Active / Blocked / Backlog split
+- **Status distribution** — donut: Completed / Active / Blocked / Backlog
 - **Items by Platform** — horizontal stacked bar, status breakdown per platform
-- **Items by DPDK Version** — Completed vs Blocked per version
+- **Items by DPDK Version** — Completed vs Blocked vs Backlog per version
 - **Items by Priority** — P0–P3 breakdown by status
 
 ### Benchmark Matrix
-A heatmap of **Benchmark Type × Platform**. Each cell shows the worst-case status (Blocked > Active > Completed > Backlog) plus a mini breakdown (e.g. `3 Blocked · 12 Active · 30 Completed`).
+Heatmap of **Benchmark Type × Platform**. Each cell shows worst-case status (Blocked > Active > Completed > Backlog) plus a mini breakdown (e.g. `3 Blocked · 12 Active · 30 Completed`).
 
-**Click any cell** to open a drill-down panel below the matrix showing every item in that cell, sorted by severity (Blocked first), with direct GitHub links and full field columns. Use this to investigate unexpectedly high blocked counts.
+**Click any cell** → drill-down panel opens below the matrix showing every item in that cell, sorted by severity, with direct GitHub links.
 
 ### All Items
-Full table of every item in the current filter — title (linked), DPDK Version, Platform, Benchmark Type, Ports, Phase, Priority, Status.
+Full table of every item in the current filter with direct GitHub links, DPDK Version, Platform, Benchmark Type, Ports, Phase, Priority, Status.
+
+### 🏃 Sprint & Effort
+Two sections, all filtered by Sprint / Issue Type / Platform selectors at the top.
+
+**Sprint Burndown:**
+- 5 KPI cards: Total, Completed, Active, Blocked, Backlog
+- Line chart: % completed and % blocked trend across all sprints
+- Stacked bar chart: absolute item counts per sprint
+
+**Effort Tracking** (requires `Planned Efforts` and `Actual Efforts` fields to be set on items):
+- 4 summary cards: Planned days, Actual days, Remaining days, Variance
+- Burn progress bar: actual vs planned, colour-coded blue → amber → red
+- Per-item table sorted by worst variance first, with mini burn bars per row
+
+### 📅 Timeline
+Filtered by Date Range / DPDK Version / Platform / Priority selectors.
+
+**Delayed Items** — past planned end date, not completed. Sorted oldest overdue first. Colour-coded overdue severity: 🔴 >30 days, 🟠 >14 days, 🟡 >7 days.
+
+**Ongoing Items** — active items, sorted by soonest deadline. Shows days remaining (colour-coded), and a progress bar showing % of planned duration elapsed.
+
+Tab button shows a live badge count of delayed items.
 
 ### ⚠ Data Quality
-Scoped automatically to **Regression Testing** items (matched by `Category = "Regression testing"`). Falls back to all filtered items if no regression items are found.
+Scoped to `Category = "Regression testing"` items. Falls back to all filtered items if no regression items are found.
 
-**Summary row:**
-- **Truly missing** — no value found by any inference method; needs a human
-- **Needs field update** — value was resolved (via inheritance, title, or comment) but the GitHub field is empty; open the ticket and set it
-- **Fully resolved** — all 3 fields set directly as GitHub fields
+**Three categories:**
+- **✗ Truly missing** — no value found by any method; needs human input
+- **⚠ Needs field update** — value resolved by inference but GitHub field is empty; open ticket and set it
+- **✓ Fully resolved** — all 3 fields set directly in GitHub
 
-**Per-field cards** show the count of truly missing items and how many were resolved by each source (parent, children, sibling, title, comment).
+Per-field summary cards show counts resolved by each source (parent, children, sibling, title, comment).
 
-**Needs field update table** — lists every item where inference found a value but the field isn't set, with coloured source pills (↓ from parent, ↑ from children, ↔ from sibling, ⚡ from title, 💬 from comment).
+The truly missing table includes a **First Comment (fetched)** column — if it shows `⚠ No comment fetched`, the PAT needs `Issues: Read-only` added.
 
-**Truly missing table** — includes a **First Comment (fetched)** column showing the raw comment text received from GitHub. This is used to diagnose whether comments are being fetched at all. If it shows `⚠ No comment fetched`, the PAT needs `Issues: Read-only` repository permission added.
-
-The tab button shows a live badge count of truly missing items.
-
-#### Export CSV
-**⬇ Export CSV** downloads all regression items with columns for each field value and its source. Columns include:
-- `DPDK Version`, `DPDK Source` (field / inherited from parent / aggregated from children / shared from sibling / inferred from title / inferred from first comment / missing)
-- Same pair for `Platform` and `Benchmark Type`
-- `Missing Fields` — semicolon-separated list of fields with no value found
-- `Needs Field Update` — fields resolved by inference but not yet set in GitHub
+**⬇ Export CSV** downloads all regression items with field values and sources for triage.
 
 ---
 
 ## Filters
 
-The sidebar has two groups:
+### Sidebar (global — affects all tabs)
+**Core:** DPDK Version, Platform, Benchmark Type, Ports, Status, Phase
+**Planning:** Sprint, Priority, Issue Type, Category
+**Search:** title substring, real-time
 
-**Core** — DPDK Version, Platform, Benchmark Type, Ports, Status, Phase
-**Planning** — Sprint, Priority, Issue Type, Category
+### Timeline tab (local)
+Date Range (presets: current month, next month, ±1/2/3 months, custom range), DPDK Version, Platform, Priority
 
-All filters apply simultaneously. The search box filters by title substring in real time. **Reset** clears all filters.
+### Sprint & Effort tab (local)
+Sprint, Issue Type, Platform
 
 ---
 
@@ -306,6 +341,11 @@ const REQUIRED_FIELDS = [
 const REGRESSION_CATEGORIES = ["regression testing", "regression", "patch-validation"];
 ```
 
+### Add a new DPDK version to inference
+```js
+const KNOWN_DPDK = ["25.11","25.07","26.03","24.11","24.07","23.11","23.07","24.03","26.07"];
+```
+
 ### Add a new platform
 ```js
 { patterns: ["naples", "naples25"], canonical: "Naples" },
@@ -313,18 +353,20 @@ const REGRESSION_CATEGORIES = ["regression testing", "regression", "patch-valida
 
 ### Add a new benchmark
 ```js
-{ patterns: ["flow-perf","flow_perf","flowperf"], canonical: "flow-perf", category: "NIC Based" },
-```
-
-### Add a new DPDK version to inference
-```js
-const KNOWN_DPDK = ["25.11","25.07","26.03","24.11","24.07","23.11","23.07","24.03","26.07"];
+{ patterns: ["flow-perf","flow_perf"], canonical: "flow-perf", category: "NIC Based" },
 ```
 
 ### Change the project
 ```js
 const ORG            = "AMD-DEAE-CEME";
 const PROJECT_NUMBER = 19;
+```
+
+### Adjust health score weights
+```js
+// In renderHealthScore():
+const score = Math.round((passRate * 0.40 + onTimeRate * 0.35 + dqRate * 0.25) * 100);
+// Change the three multipliers — they must sum to 1.0
 ```
 
 ---
@@ -335,20 +377,86 @@ const PROJECT_NUMBER = 19;
 |---|---|---|
 | "Request failed" | Token expired or wrong permissions | Regenerate PAT with Org → Projects: Read-only and Repo → Issues: Read-only |
 | Comments show "⚠ No comment fetched" | PAT missing Issues: Read-only | Add Repository → Issues: Read-only to the PAT and regenerate |
-| "Maximum call stack size exceeded" | Circular parent links in data | Already fixed — if it reappears, report which issue numbers are involved |
-| Charts not showing | Chart.js CDN blocked | Table, matrix, and data quality still work fully |
-| Fields all blank | Field names changed in GitHub | Run `debug-github-fields.html` and update `FIELDS` in the script |
-| DPDK version not inferred from title | Version written in unexpected format | Check the actual text and add the pattern to `KNOWN_DPDK` or widen the regex |
+| "Maximum call stack size exceeded" | Circular parent links in data | Already fixed with iterative BFS — if it reappears, report which issue numbers are involved |
+| Charts not showing | Chart.js CDN blocked | Table, matrix, data quality, and effort tracking still work fully |
+| Fields all blank | Field names changed in GitHub | Run `debug-github-fields.html` and update `FIELDS` / `DATE_FIELDS` / `EFFORT_FIELDS` |
+| DPDK version not inferred | Version in unexpected format | Check the actual text and add the pattern to `KNOWN_DPDK` or widen the regex |
 | Platform not inferred | Platform name not in taxonomy | Add the variant to `PLATFORM_TAXONOMY` |
 | Benchmark not inferred | Benchmark name not in taxonomy | Add the variant to `BENCHMARK_TAXONOMY` |
-| Parent-child inheritance not working | Native sub-issue link not set in GitHub | Use GitHub's "Add sub-issue" button, OR ensure title keywords overlap for title-similarity fallback |
-| Grandparent value not reaching grandchildren | Title-similarity only links one level | Native GitHub sub-issue links work across all levels; title-similarity only links one hop |
+| Parent-child inheritance not working | Native sub-issue link not set | Use GitHub's "Add sub-issue" button, or ensure title keywords overlap for title-similarity fallback |
+| Effort tracking shows no data | Planned/Actual Efforts fields not set | Set `Planned Efforts` and `Actual Efforts` NUMBER fields on issues |
+| Health score not showing | No items match regression category | Check `REGRESSION_CATEGORIES` and ensure `Category` field is set on items |
+| Sprint burndown flat | Items have no sprint assigned | Assign items to a sprint via the `Sprint Name` field |
+| Timeline shows no items | No planned dates set | Set `Planned Start date` and `Planned End date` on active issues |
+
+---
+
+## Potential Enhancements
+
+The following features have been identified as high-value additions for future development, grouped by effort and impact.
+
+### High Impact — Ready to Build
+
+**Column sorting on all tables**
+Click any column header to sort ascending/descending. Zero new data needed. Particularly useful in Timeline (sort by "Overdue By") and Effort Tracking (sort by variance). Estimated effort: low.
+
+**Persistent filters via URL hash**
+Save filter state into the URL (`#dpdk=25.07&platform=Sorano`) so a filtered view can be shared by copying the link. Pure client-side — no backend needed. Estimated effort: low.
+
+**Timeline CSV export**
+The Data Quality tab has CSV export; Timeline doesn't. Delayed items are frequently shared with managers. One-click export of delayed/ongoing items with all date fields. Estimated effort: low.
+
+**Auto-refresh**
+Toggle to reload data automatically every 5/10/30 minutes. Useful when the dashboard is displayed on a shared monitor during sprints. Estimated effort: low.
+
+**Keyboard shortcuts**
+`Shift+R` to refresh, `1–6` to switch tabs, `Escape` to close drill-down panels. Small improvement but significant during daily standups. Estimated effort: low.
+
+### Medium Impact — Moderate Effort
+
+**Milestone tracking view**
+A dedicated tab for `Issue Type = Milestone` items showing each milestone, its child completion percentage, planned end date, and on-time status. Your project already has milestone issue types and date fields. Estimated effort: medium.
+
+**Benchmark completion heatmap**
+Variant of the current matrix showing **% complete** per cell rather than worst-case status. More nuanced — a cell with 18 of 20 done looks very different from 2 of 2 done. Estimated effort: medium.
+
+**Stale items detector**
+Flag items that have been `In Progress` for more than N configurable days without an `Actual End Date`. Surfaces forgotten or abandoned tasks. Add as a section in the Data Quality tab. Estimated effort: medium.
+
+**Effort data quality check**
+Extend Data Quality to flag regression items where `Planned Efforts` is zero or missing — the same pattern as the current DPDK/Platform/Benchmark check. Estimated effort: low-medium.
+
+**Trend over sprints (pass/block rates)**
+A line chart in the Overview tab showing pass rate, blocked rate, and completion rate across all sprints. Answers "are we improving sprint over sprint?" without manually comparing filters. Estimated effort: medium.
+
+**Effort vs schedule scatter plot**
+X-axis: days overdue. Y-axis: effort variance. Items in the top-right quadrant (both time and effort over budget) are the highest-risk items and deserve escalation. Estimated effort: medium.
+
+### Larger Features
+
+**Gantt chart view**
+Use planned start/end dates to draw a Gantt chart per sprint or platform. D3.js is already available. Would make the Timeline tab significantly more visual and easier to present. Estimated effort: high.
+
+**Collapse/expand issue type groups in All Items table**
+Group rows by Issue Type (EPIC → Main-Task → Sub-Task) with collapsible sections. Makes the hierarchy visible without opening GitHub. Estimated effort: medium-high.
+
+**Multi-project support**
+Load from more than one project number simultaneously and merge results. Useful if regression work is split across multiple GitHub projects or teams. Estimated effort: high.
+
+**Duplicate detection**
+Surface items with near-identical titles (e.g. `[ST-Sorano] Testpmd` appearing twice with different issue numbers) as potential duplicates in the Data Quality tab. Estimated effort: medium.
+
+**GitHub write-back**
+A "Fix it" button next to inferred items in Data Quality that calls the GitHub API to set the field value directly — turning the dashboard from read-only into an active data-cleaning tool. Requires a token with write permissions. Estimated effort: high.
+
+**Dark/light theme persistence**
+Currently theme resets on tab close (sessionStorage). Storing in localStorage would keep the preference across sessions. Estimated effort: trivial.
 
 ---
 
 ## Companion Tool
 
-`debug-github-fields.html` — open in a browser, paste your PAT, click **Inspect Fields**. Lists every field in your project with its exact name, data type, and all option values. Use this whenever you suspect a field name has changed or before adding new fields to `FIELDS`.
+`debug-github-fields.html` — open in a browser, paste your PAT, click **Inspect Fields**. Lists every field in your project with its exact name, data type, and all option values. Use this whenever you suspect a field name has changed or before adding new fields to the dashboard config.
 
 ---
 
@@ -358,5 +466,6 @@ const PROJECT_NUMBER = 19;
 - **No localStorage** — token uses `sessionStorage` only, cleared on tab close
 - **Pagination** — fetches all project items in 100-item pages automatically; no item limit
 - **Single file** — entire dashboard (HTML + CSS + JS) in one file; only external dependency is Chart.js CDN which degrades gracefully
-- **Theme** — dark/light toggle stored in `sessionStorage`, resets on tab close
 - **Inference is read-only** — inferred values are never written back to GitHub; they exist only in the browser session for display and CSV export
+- **Cycle-safe inheritance** — parent-child resolution uses BFS (not recursion) with a 200-step depth limit; cycle detection prevents infinite loops regardless of data shape
+- **Theme** — dark/light toggle stored in `sessionStorage`, resets on tab close
