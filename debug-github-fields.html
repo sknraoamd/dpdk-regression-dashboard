@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>GitHub Project Field Debugger</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { color-scheme: dark; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #050c1a; color: #dde6f0;
+      min-height: 100vh; padding: 32px 24px;
+    }
+    h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: rgba(180,200,220,0.6); margin-bottom: 28px; }
+    .card {
+      background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 16px; padding: 24px; max-width: 860px; margin-bottom: 20px;
+    }
+    label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.7px; color: rgba(180,200,220,0.6); margin-bottom: 8px; }
+    input {
+      width: 100%; padding: 11px 14px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.09); background: rgba(0,0,0,0.35);
+      color: #dde6f0; font-size: 13px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+      outline: none; margin-bottom: 14px;
+    }
+    input:focus { border-color: #3b82f6; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .row input { flex: 1; min-width: 180px; margin-bottom: 0; }
+    button {
+      padding: 11px 22px; border-radius: 10px; border: none;
+      background: #3b82f6; color: #fff; font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: background 0.15s; white-space: nowrap;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #1e3a5f; color: #6b7280; cursor: not-allowed; }
+    .hint { margin-top: 10px; font-size: 12px; color: rgba(180,200,220,0.5); line-height: 1.6; }
+    .hint b { color: #93c5fd; }
+
+    /* Results */
+    #results { display: none; }
+    .section-title {
+      font-size: 15px; font-weight: 700; margin-bottom: 12px;
+      display: flex; align-items: center; gap-8px;
+    }
+    .tag {
+      display: inline-block; margin-left: 8px; padding: 2px 10px;
+      border-radius: 99px; font-size: 11px; font-weight: 600;
+      background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: #93c5fd;
+    }
+    table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
+    thead th {
+      padding: 9px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: rgba(180,200,220,0.6); text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.08); background: rgba(0,0,0,0.2);
+    }
+    thead th:first-child { border-radius: 8px 0 0 0; }
+    thead th:last-child  { border-radius: 0 8px 0 0; }
+    tbody tr:hover { background: rgba(255,255,255,0.04); }
+    tbody td { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.05); vertical-align: top; }
+    .dt-badge {
+      display: inline-block; padding: 2px 9px; border-radius: 99px;
+      font-size: 11px; font-weight: 700; font-family: monospace;
+    }
+    .dt-SINGLE_SELECT { background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); color: #93c5fd; }
+    .dt-TEXT          { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+    .dt-ITERATION     { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: #fde68a; }
+    .dt-NUMBER        { background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); color: #c4b5fd; }
+    .dt-DATE          { background: rgba(244,63,94,0.15);  border: 1px solid rgba(244,63,94,0.3);  color: #fda4af; }
+    .dt-TITLE         { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #dde6f0; }
+    .dt-other         { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);  color: #9ca3af; }
+    .options-list { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .opt-chip {
+      display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 11px;
+      background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.1); color: #9ca3af;
+    }
+
+    /* Raw JSON */
+    .raw-toggle {
+      display: inline-block; margin-top: 14px; font-size: 12px; color: #3b82f6;
+      cursor: pointer; text-decoration: underline;
+    }
+    pre {
+      display: none; margin-top: 10px; padding: 16px; border-radius: 10px;
+      background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.07);
+      font-size: 12px; font-family: 'Cascadia Code', 'Fira Code', monospace;
+      overflow: auto; max-height: 360px; color: #a3e635; white-space: pre-wrap;
+    }
+    pre.show { display: block; }
+
+    /* Error */
+    .error {
+      display: none; padding: 12px 16px; border-radius: 10px; margin-top: 14px;
+      background: rgba(244,63,94,0.10); border: 1px solid rgba(244,63,94,0.25); color: #fda4af;
+      font-size: 13px;
+    }
+    .error.show { display: block; }
+    .error b { font-weight: 700; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: none; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+      vertical-align: middle; margin-right: 6px;
+    }
+    .spinner.show { display: inline-block; }
+
+    /* Copy button */
+    .copy-btn {
+      float: right; padding: 6px 14px; font-size: 11px; font-weight: 600;
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+      color: #dde6f0; border-radius: 8px; cursor: pointer; margin-top: -2px;
+    }
+    .copy-btn:hover { background: rgba(255,255,255,0.14); }
+  </style>
+</head>
+<body>
+
+  <h1>🔬 GitHub Project Field Debugger</h1>
+  <p class="sub">Inspects all fields in your GitHub Project v2 — no setup needed.</p>
+
+  <div class="card">
+    <label>Fine-grained Personal Access Token</label>
+    <div class="row">
+      <input id="tokenInput" type="password" placeholder="Paste your PAT (Org → Projects: Read-only)" spellcheck="false" />
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;align-items:center">
+      <label style="margin:0;white-space:nowrap">Org</label>
+      <input id="orgInput" value="AMD-DEAE-CEME" style="width:200px;margin:0" />
+      <label style="margin:0;white-space:nowrap">Project #</label>
+      <input id="projInput" value="19" type="number" style="width:80px;margin:0" />
+      <button id="runBtn" onclick="runDebug()">
+        <span class="spinner" id="spinner"></span>Inspect Fields
+      </button>
+    </div>
+
+    <p class="hint">
+      Needs a <b>fine-grained PAT</b> with <b>Organization → Projects: Read-only</b>.<br>
+      Token is only used here in your browser — never sent anywhere except GitHub's API.
+    </p>
+
+    <div class="error" id="errorBox"><b>Error:</b> <span id="errorMsg"></span></div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+    <div class="card">
+      <div class="section-title">
+        Project Fields <span class="tag" id="fieldCount"></span>
+        <button class="copy-btn" onclick="copyTable()">📋 Copy as text</button>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Field Name</th>
+            <th>Data Type</th>
+            <th>Options / Details</th>
+          </tr>
+        </thead>
+        <tbody id="fieldsBody"></tbody>
+      </table>
+
+      <span class="raw-toggle" onclick="toggleRaw()">▶ Show raw JSON</span>
+      <pre id="rawJson"></pre>
+    </div>
+
+    <div class="card" style="background:rgba(59,130,246,0.06);border-color:rgba(59,130,246,0.2)">
+      <div class="section-title">📋 What to share</div>
+      <p style="font-size:13px;color:rgba(180,200,220,0.8);line-height:1.7">
+        Share the table above (use "Copy as text") with the field names and data types.
+        That's all that's needed to fix the dashboard's field mapping and GraphQL query.
+      </p>
+    </div>
+  </div>
+
+<script>
+const GQL = "https://api.github.com/graphql";
+
+const FIELDS_QUERY = `
+query($org: String!, $number: Int!) {
+  organization(login: $org) {
+    projectV2(number: $number) {
+      title
+      fields(first: 50) {
+        nodes {
+          ... on ProjectV2FieldCommon {
+            name
+            dataType
+          }
+          ... on ProjectV2SingleSelectField {
+            name
+            dataType
+            options { name color }
+          }
+          ... on ProjectV2IterationField {
+            name
+            dataType
+            configuration {
+              iterations { title startDate duration }
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+async function runDebug() {
+  const token = document.getElementById('tokenInput').value.trim();
+  const org   = document.getElementById('orgInput').value.trim();
+  const num   = parseInt(document.getElementById('projInput').value.trim(), 10);
+
+  const errorBox = document.getElementById('errorBox');
+  const spinner  = document.getElementById('spinner');
+  const runBtn   = document.getElementById('runBtn');
+  errorBox.classList.remove('show');
+
+  if (!token) { showError("Please paste your fine-grained PAT."); return; }
+  if (!org)   { showError("Please enter the organisation name."); return; }
+  if (!num)   { showError("Please enter a valid project number."); return; }
+
+  spinner.classList.add('show');
+  runBtn.disabled = true;
+
+  try {
+    const res  = await fetch(GQL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: FIELDS_QUERY, variables: { org, number: num } })
+    });
+    const json = await res.json();
+
+    if (!res.ok || json.errors) {
+      throw new Error(json.errors?.[0]?.message || `HTTP ${res.status}`);
+    }
+
+    const project = json.data?.organization?.projectV2;
+    if (!project) throw new Error("Project not found. Check org name and project number.");
+
+    renderResults(project, json);
+
+  } catch(e) {
+    showError(e.message);
+  } finally {
+    spinner.classList.remove('show');
+    runBtn.disabled = false;
+  }
+}
+
+function renderResults(project, rawJson) {
+  const fields = project.fields?.nodes || [];
+  document.getElementById('fieldCount').textContent = `${fields.length} fields`;
+  document.getElementById('rawJson').textContent = JSON.stringify(rawJson, null, 2);
+
+  const tbody = document.getElementById('fieldsBody');
+  tbody.innerHTML = '';
+
+  fields.forEach((f, i) => {
+    if (!f.name) return;
+    const dt    = f.dataType || 'unknown';
+    const cls   = `dt-${['SINGLE_SELECT','TEXT','ITERATION','NUMBER','DATE','TITLE'].includes(dt) ? dt : 'other'}`;
+
+    // Build options/details cell
+    let details = '—';
+    if (f.options?.length) {
+      details = `<div class="options-list">${f.options.map(o => `<span class="opt-chip">${esc(o.name)}</span>`).join('')}</div>`;
+    } else if (f.configuration?.iterations?.length) {
+      const iters = f.configuration.iterations.slice(0, 5);
+      details = `<div class="options-list">${iters.map(it => `<span class="opt-chip">${esc(it.title)}</span>`).join('')}${f.configuration.iterations.length > 5 ? `<span class="opt-chip">+${f.configuration.iterations.length-5} more</span>` : ''}</div>`;
+    }
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:rgba(180,200,220,0.4);font-size:12px">${i+1}</td>
+      <td style="font-weight:600">${esc(f.name)}</td>
+      <td><span class="dt-badge ${cls}">${dt}</span></td>
+      <td>${details}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function esc(str) {
+  return (str ?? '').toString()
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+function showError(msg) {
+  document.getElementById('errorMsg').textContent = msg;
+  document.getElementById('errorBox').classList.add('show');
+}
+
+function toggleRaw() {
+  const pre = document.getElementById('rawJson');
+  const tog = document.querySelector('.raw-toggle');
+  pre.classList.toggle('show');
+  tog.textContent = pre.classList.contains('show') ? '▼ Hide raw JSON' : '▶ Show raw JSON';
+}
+
+function copyTable() {
+  const rows = [...document.querySelectorAll('#fieldsBody tr')];
+  const lines = ['#\tField Name\tData Type\tOptions'].concat(
+    rows.map(tr => [...tr.querySelectorAll('td')].map(td => td.innerText.replace(/\n/g,' ')).join('\t'))
+  );
+  navigator.clipboard.writeText(lines.join('\n'))
+    .then(() => { const b = document.querySelector('.copy-btn'); b.textContent = '✓ Copied!'; setTimeout(() => b.textContent = '📋 Copy as text', 2000); })
+    .catch(() => alert('Copy failed — please select and copy manually.'));
+}
+
+// Allow Enter key on inputs
+document.addEventListener('keydown', e => { if (e.key === 'Enter') runDebug(); });
+</script>
+</body>
+</html>
